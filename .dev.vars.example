@@ -1,0 +1,5 @@
+# Sao chép thành .dev.vars khi bạn có giá trị thật.
+# Wrangler đọc file này ở máy local và không đưa vào frontend.
+# ADMIN_EMAIL=ban@example.com
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=

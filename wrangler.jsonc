@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "webstudio-app",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-03-01",
+  // Giao diện Vite nằm trong dist/. /api do Worker xử lý trước.
+  "assets": {
+    "directory": "./dist",
+    "binding": "STATIC",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Thay database_id bằng ID Cloudflare hiện khi bạn tạo D1. Không điền khóa giả.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webstudio-app",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  // Tạo bucket đúng tên này trên Cloudflare, rồi gắn binding ASSETS.
+  "r2_buckets": [
+    {
+      "binding": "ASSETS",
+      "bucket_name": "webstudio-assets"
+    }
+  ],
+  // Đổi APP_ORIGIN thành địa chỉ thật của ứng dụng trước khi bạn tự triển khai.
+  "vars": {
+    "APP_ORIGIN": "http://127.0.0.1:5173"
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true
+    }
+  ]
+}
