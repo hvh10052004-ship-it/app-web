@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "webstudio-app",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "aeb6495a-35c9-499c-ad1d-7ae029acfb28"
     }
   ],
   // Tạo bucket đúng tên này trên Cloudflare, rồi gắn binding ASSETS.
