@@ -1,27 +1,20 @@
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { FormEvent, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, api } from "../lib/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { user, refresh } = useAuth();
-  const [params] = useSearchParams();
-  useEffect(() => {
-    if (params.get("google") === "1" && user) {
-      sessionStorage.setItem("webstudio-gate", "1");
-      navigate("/");
-    }
-  }, [user, params, navigate]);
-  const [email, setEmail] = useState("");
+  const { refresh } = useAuth();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(params.get("loi") === "google" ? "Đăng nhập Google chưa hoàn tất." : "");
+  const [error, setError] = useState("");
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
-      await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      await api("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
       await refresh();
       sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
@@ -32,15 +25,9 @@ export function LoginPage() {
 
   return (
     <AuthCard title="Đăng nhập" error={error} onSubmit={onSubmit}>
-      <Input label="Email" type="email" value={email} onChange={setEmail} />
+      <Input label="Tên tài khoản" value={username} onChange={setUsername} />
       <Input label="Mật khẩu" type="password" value={password} onChange={setPassword} />
       <button className="w-full rounded-full bg-[#102033] py-3 font-bold text-white">Vào ứng dụng</button>
-      <a href="/api/auth/google" className="block rounded-full border border-slate-200 py-3 text-center font-semibold">
-        Tiếp tục với Google
-      </a>
-      <p className="text-center text-xs leading-5 text-stone-500">
-        Nút này chỉ chạy sau khi Worker có GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET. Không ghi hai giá trị đó vào mã nguồn.
-      </p>
       <Link to="/dang-ky" className="block text-center text-sm font-semibold text-slate-500">
         Chưa có tài khoản? Đăng ký
       </Link>
@@ -51,8 +38,7 @@ export function LoginPage() {
 export function RegisterPage() {
   const navigate = useNavigate();
   const { refresh } = useAuth();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -60,7 +46,7 @@ export function RegisterPage() {
     event.preventDefault();
     setError("");
     try {
-      await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
+      await api("/api/auth/register", { method: "POST", body: JSON.stringify({ username, password }) });
       await refresh();
       sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
@@ -71,13 +57,9 @@ export function RegisterPage() {
 
   return (
     <AuthCard title="Đăng ký" error={error} onSubmit={onSubmit}>
-      <Input label="Họ tên" value={name} onChange={setName} />
-      <Input label="Email" type="email" value={email} onChange={setEmail} />
+      <Input label="Tên tài khoản" value={username} onChange={setUsername} />
       <Input label="Mật khẩu" type="password" value={password} onChange={setPassword} />
       <button className="w-full rounded-full bg-[#102033] py-3 font-bold text-white">Tạo tài khoản</button>
-      <a href="/api/auth/google" className="block rounded-full border border-slate-200 py-3 text-center font-semibold">
-        Đăng ký với Google
-      </a>
       <Link to="/dang-nhap" className="block text-center text-sm font-semibold text-slate-500">
         Đã có tài khoản? Đăng nhập
       </Link>
@@ -119,7 +101,7 @@ function Input({
   return (
     <label className="block text-sm font-semibold">
       {label}
-      <input className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3" type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-3" type={type} value={value} onChange={(e) => onChange(e.target.value)} autoCapitalize="none" />
     </label>
   );
 }
