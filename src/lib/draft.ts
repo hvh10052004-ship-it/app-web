@@ -1,5 +1,12 @@
 import { siteTypes, type SiteTypeId } from "../data/catalog";
 
+export type Product = {
+  id: string;
+  name: string;
+  price: string;
+  note: string;
+};
+
 export type Draft = {
   typeId: SiteTypeId;
   templateId: string;
@@ -7,6 +14,7 @@ export type Draft = {
   phone: string;
   headline: string;
   about: string;
+  products: Product[];
 };
 
 const KEY = "webstudio-draft";
@@ -19,6 +27,7 @@ const empty: Draft = {
   phone: "",
   headline: "",
   about: "",
+  products: [],
 };
 
 function blank(typeId: SiteTypeId): Draft {
@@ -43,7 +52,8 @@ function readAll(): Partial<Record<SiteTypeId, Draft>> {
 
 export function readDraftOf(typeId: SiteTypeId): Draft {
   const stored = readAll()[typeId];
-  return stored ? { ...blank(typeId), ...stored, typeId } : blank(typeId);
+  const draft = stored ? { ...blank(typeId), ...stored, typeId } : blank(typeId);
+  return { ...draft, products: Array.isArray(draft.products) ? draft.products : [] };
 }
 
 export function readDraft(): Draft {
@@ -58,7 +68,7 @@ export function writeDraft(next: Draft) {
   localStorage.setItem(KEY, JSON.stringify(all));
   localStorage.setItem(ACTIVE_KEY, next.typeId);
   const saved = readSaved();
-  saved[next.typeId] = Boolean(next.name.trim() || next.headline.trim() || next.about.trim() || next.phone.trim());
+  saved[next.typeId] = Boolean(next.name.trim() || next.headline.trim() || next.about.trim() || next.phone.trim() || next.products.some((item) => item.name.trim()));
   localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
 }
 

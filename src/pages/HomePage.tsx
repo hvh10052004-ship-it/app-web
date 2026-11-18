@@ -93,7 +93,7 @@ export function HomePage() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Link to="/xem" className="rounded-2xl bg-[#3a3633] py-3 text-center text-sm font-bold">Xem trang</Link>
-            <Link to="/soan" className="rounded-2xl bg-[#8b6cff] py-3 text-center text-sm font-bold">Tiếp tục soạn</Link>
+            <Link to="/soan/noi-dung" className="rounded-2xl bg-[#8b6cff] py-3 text-center text-sm font-bold">Tiếp tục soạn</Link>
           </div>
         </article>
         <div className="mt-3 space-y-2">

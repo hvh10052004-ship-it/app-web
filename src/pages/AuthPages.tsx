@@ -35,12 +35,6 @@ export function LoginPage() {
       <Input label="Email" type="email" value={email} onChange={setEmail} />
       <Input label="Mật khẩu" type="password" value={password} onChange={setPassword} />
       <button className="w-full rounded-full bg-[#102033] py-3 font-bold text-white">Vào ứng dụng</button>
-      <a href="/api/auth/google" className="block rounded-full border border-slate-200 py-3 text-center font-semibold">
-        Tiếp tục với Google
-      </a>
-      <p className="text-center text-xs leading-5 text-stone-500">
-        Nút này chỉ chạy sau khi Worker có GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET. Không ghi hai giá trị đó vào mã nguồn.
-      </p>
       <Link to="/dang-ky" className="block text-center text-sm font-semibold text-slate-500">
         Chưa có tài khoản? Đăng ký
       </Link>
@@ -75,9 +69,6 @@ export function RegisterPage() {
       <Input label="Email" type="email" value={email} onChange={setEmail} />
       <Input label="Mật khẩu" type="password" value={password} onChange={setPassword} />
       <button className="w-full rounded-full bg-[#102033] py-3 font-bold text-white">Tạo tài khoản</button>
-      <a href="/api/auth/google" className="block rounded-full border border-slate-200 py-3 text-center font-semibold">
-        Đăng ký với Google
-      </a>
       <Link to="/dang-nhap" className="block text-center text-sm font-semibold text-slate-500">
         Đã có tài khoản? Đăng nhập
       </Link>

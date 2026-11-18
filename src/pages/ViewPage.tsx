@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { siteTypes, typeById, type SiteTypeId } from "../data/catalog";
 import { api, ApiError } from "../lib/api";
-import { readDraftOf, readSaved, writeDraft, type Draft } from "../lib/draft";
+import { readDraftOf, readSaved, writeDraft, type Draft, type Product } from "../lib/draft";
 
 export function ViewPage() {
   const saved = readSaved();
@@ -68,10 +68,13 @@ export function ViewDetailPage() {
     const next = { ...draft, typeId: type.id };
     writeDraft(next);
     const lines = fields.map((field) => `${field.label}: ${next[field.key].trim() || "(chưa nhập)"}`);
+    const products = next.products
+      .filter((item) => item.name.trim())
+      .map((item, index) => `${index + 1}. ${item.name} — ${item.price || "chưa có giá"}`);
     try {
       await api("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ body: [`Đã sửa ${type.name}`, ...lines].join("\n") }),
+        body: JSON.stringify({ body: [`Đã sửa ${type.name}`, ...lines, ...(products.length ? ["Sản phẩm:", ...products] : [])].join("\n") }),
       });
       setSaved("Đã sửa và gửi lại tin nhắn cho admin.");
     } catch (error) {
@@ -107,8 +110,45 @@ export function ViewDetailPage() {
           )}
         </label>
       ))}
+      {type.id === "ecommerce" && (
+        <ProductList
+          products={draft.products}
+          onChange={(products) => setDraft({ ...draft, products, typeId: type.id })}
+        />
+      )}
       {saved && <p className="text-sm text-emerald-700">{saved}</p>}
       <button className="w-full rounded-full bg-[#7c5cff] py-3 font-bold text-white">Lưu phần đã sửa</button>
     </form>
+  );
+}
+
+function ProductList({ products, onChange }: { products: Product[]; onChange: (products: Product[]) => void }) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+
+  return (
+    <div className="space-y-2 rounded-3xl bg-white p-4">
+      <h3 className="font-extrabold">Sản phẩm</h3>
+      {products.map((item) => (
+        <div key={item.id} className="flex justify-between text-sm">
+          <span>{item.name} · {item.price || "chưa có giá"}</span>
+          <button type="button" className="font-semibold text-red-600" onClick={() => onChange(products.filter((entry) => entry.id !== item.id))}>Xóa</button>
+        </div>
+      ))}
+      <input className="w-full rounded-2xl border border-stone-200 px-3 py-3" placeholder="Tên sản phẩm" value={name} onChange={(event) => setName(event.target.value)} />
+      <input className="w-full rounded-2xl border border-stone-200 px-3 py-3" placeholder="Giá" value={price} onChange={(event) => setPrice(event.target.value)} />
+      <button
+        type="button"
+        className="w-full rounded-full bg-[#1c1917] py-3 font-bold text-white"
+        onClick={() => {
+          if (!name.trim()) return;
+          onChange([...products, { id: crypto.randomUUID(), name: name.trim(), price: price.trim(), note: "" }]);
+          setName("");
+          setPrice("");
+        }}
+      >
+        Thêm sản phẩm
+      </button>
+    </div>
   );
 }
