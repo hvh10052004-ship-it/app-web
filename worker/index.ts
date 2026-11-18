@@ -39,7 +39,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
     try {
       await ensureSchema(env);
-      if (url.pathname === "/api/health") return json({ ok: true });
+      if (url.pathname === "/api/health") return json({ ok: true, rev: 2 });
       if (url.pathname === "/api/auth/register" && request.method === "POST") {
         return register(request, env);
       }
