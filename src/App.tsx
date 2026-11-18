@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Shell } from "./components/Shell";
-import { AccountPage } from "./pages/AccountPage";
+import { AccountPage, ProfilePage, ThemePage } from "./pages/AccountPage";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import { ChatPage } from "./pages/ChatPage";
 import { HomePage } from "./pages/HomePage";
@@ -39,6 +39,8 @@ export function App() {
             <Route path="xem/:loai" element={<ViewDetailPage />} />
             <Route path="yeu-cau" element={<RequestPage />} />
             <Route path="chat" element={<ChatPage />} />
+            <Route path="toi/ho-so" element={<ProfilePage />} />
+            <Route path="toi/giao-dien" element={<ThemePage />} />
             <Route path="toi/quyen-rieng-tu" element={<PrivacyPage />} />
             <Route path="toi/gioi-thieu" element={<AboutPage />} />
             <Route path="toi/nha-phat-trien" element={<DeveloperPage />} />

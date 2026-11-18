@@ -64,6 +64,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       if (url.pathname === "/api/me/avatar" && request.method === "POST") {
         return uploadAvatar(request, env);
       }
+      if (url.pathname === "/api/me/security" && request.method === "POST") {
+        return updateSecurity(request, env);
+      }
       if (url.pathname.startsWith("/api/files/") && request.method === "GET") {
         return readFile(request, env, url.pathname.slice("/api/files/".length));
       }
@@ -151,6 +154,36 @@ async function updateMe(request: Request, env: Env) {
   if (!name) return json({ error: "Tên không được để trống." }, 400);
   await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name, user.id).run();
   return json({ user: publicUser({ ...user, name }, env) });
+}
+
+async function updateSecurity(request: Request, env: Env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+  const body = await readJson(request);
+  const email = cleanEmail(body.email);
+  const currentPassword = String(body.currentPassword ?? "");
+  const newPassword = String(body.newPassword ?? "");
+  if (!email) return json({ error: "Email chưa hợp lệ." }, 400);
+  if (!user.password_hash || !user.password_salt) {
+    return json({ error: "Tài khoản Google đổi email và mật khẩu tại Google." }, 400);
+  }
+  if (!currentPassword) return json({ error: "Nhập mật khẩu hiện tại." }, 400);
+  const { hash } = await hashPassword(currentPassword, fromHex(user.password_salt));
+  if (!safeEqual(hash, user.password_hash)) return json({ error: "Mật khẩu hiện tại chưa đúng." }, 401);
+  const taken = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND id != ?").bind(email, user.id).first();
+  if (taken) return json({ error: "Email này đã có tài khoản khác." }, 409);
+  let passwordHash = user.password_hash;
+  let passwordSalt = user.password_salt;
+  if (newPassword) {
+    if (newPassword.length < 8) return json({ error: "Mật khẩu mới cần từ 8 ký tự." }, 400);
+    const next = await hashPassword(newPassword);
+    passwordHash = next.hash;
+    passwordSalt = next.salt;
+  }
+  await env.DB.prepare("UPDATE users SET email = ?, password_hash = ?, password_salt = ? WHERE id = ?")
+    .bind(email, passwordHash, passwordSalt, user.id)
+    .run();
+  return json({ user: publicUser({ ...user, email }, env) });
 }
 
 async function uploadAvatar(request: Request, env: Env) {

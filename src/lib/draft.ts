@@ -10,6 +10,7 @@ export type Draft = {
 };
 
 const KEY = "webstudio-draft";
+const ACTIVE_KEY = "webstudio-active-type";
 
 const empty: Draft = {
   typeId: "landing",
@@ -20,22 +21,44 @@ const empty: Draft = {
   about: "",
 };
 
-export function readDraft(): Draft {
+function blank(typeId: SiteTypeId): Draft {
+  return { ...empty, typeId, name: "" };
+}
+
+function readAll(): Partial<Record<SiteTypeId, Draft>> {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return empty;
-    const data = JSON.parse(raw) as Draft;
-    if (!siteTypes.some((item) => item.id === data.typeId)) return empty;
-    return { ...empty, ...data };
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Draft | Partial<Record<SiteTypeId, Draft>>;
+    if (data && typeof data === "object" && "typeId" in data && typeof data.typeId === "string") {
+      const one = data as Draft;
+      if (!siteTypes.some((item) => item.id === one.typeId)) return {};
+      return { [one.typeId]: { ...empty, ...one } };
+    }
+    return data as Partial<Record<SiteTypeId, Draft>>;
   } catch {
-    return empty;
+    return {};
   }
 }
 
+export function readDraftOf(typeId: SiteTypeId): Draft {
+  const stored = readAll()[typeId];
+  return stored ? { ...blank(typeId), ...stored, typeId } : blank(typeId);
+}
+
+export function readDraft(): Draft {
+  const active = (localStorage.getItem(ACTIVE_KEY) || "landing") as SiteTypeId;
+  const typeId = siteTypes.some((item) => item.id === active) ? active : "landing";
+  return readDraftOf(typeId);
+}
+
 export function writeDraft(next: Draft) {
-  localStorage.setItem(KEY, JSON.stringify(next));
+  const all = readAll();
+  all[next.typeId] = next;
+  localStorage.setItem(KEY, JSON.stringify(all));
+  localStorage.setItem(ACTIVE_KEY, next.typeId);
   const saved = readSaved();
-  saved[next.typeId] = Boolean(next.headline.trim() || next.about.trim());
+  saved[next.typeId] = Boolean(next.name.trim() || next.headline.trim() || next.about.trim() || next.phone.trim());
   localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
 }
 

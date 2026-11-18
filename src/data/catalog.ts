@@ -1,8 +1,32 @@
 export const siteTypes = [
-  { id: "landing", name: "Landing Page", blurb: "1 trang, chạy ads, thu lead, bán 1 sản phẩm.", sections: ["Hero + giá", "Lợi ích", "Đánh giá", "Form"] },
-  { id: "company", name: "Website công ty", blurb: "Giới thiệu doanh nghiệp, dịch vụ, đội ngũ, liên hệ.", sections: ["Trang chủ", "Dịch vụ", "Về chúng tôi", "Liên hệ"] },
-  { id: "saas", name: "Website Startup / SaaS", blurb: "Giới thiệu sản phẩm, bảng giá, đăng ký dùng thử.", sections: ["Hero sản phẩm", "Tính năng", "Bảng giá", "Đăng ký"] },
-  { id: "ecommerce", name: "Web bán hàng / E-commerce", blurb: "Danh mục, sản phẩm, giỏ hàng, đặt hàng COD.", sections: ["Trang chủ shop", "Sản phẩm", "Giỏ hàng", "Thanh toán"] },
+  {
+    id: "landing",
+    name: "Landing Page",
+    blurb: "1 trang, chạy ads, thu lead, bán 1 sản phẩm.",
+    note: "Một trang quảng cáo: mở đầu bằng hero và giá, nêu lợi ích, thêm đánh giá khách, kết bằng form để lại thông tin.",
+    sections: ["Hero + giá", "Lợi ích", "Đánh giá", "Form"],
+  },
+  {
+    id: "company",
+    name: "Website công ty",
+    blurb: "Giới thiệu doanh nghiệp, dịch vụ, đội ngũ, liên hệ.",
+    note: "Website doanh nghiệp: trang chủ giới thiệu, trang dịch vụ, phần về chúng tôi và đội ngũ, cuối cùng là liên hệ.",
+    sections: ["Trang chủ", "Dịch vụ", "Về chúng tôi", "Liên hệ"],
+  },
+  {
+    id: "saas",
+    name: "Website Startup / SaaS",
+    blurb: "Giới thiệu sản phẩm, bảng giá, đăng ký dùng thử.",
+    note: "Trang sản phẩm số: hero giới thiệu sản phẩm, danh sách tính năng, bảng giá, rồi nút đăng ký dùng thử.",
+    sections: ["Hero sản phẩm", "Tính năng", "Bảng giá", "Đăng ký"],
+  },
+  {
+    id: "ecommerce",
+    name: "Web bán hàng / E-commerce",
+    blurb: "Danh mục, sản phẩm, giỏ hàng, đặt hàng COD.",
+    note: "Cửa hàng online: trang chủ shop, danh mục sản phẩm, giỏ hàng và bước thanh toán, gồm đặt hàng COD.",
+    sections: ["Trang chủ shop", "Sản phẩm", "Giỏ hàng", "Thanh toán"],
+  },
 ] as const;
 
 export type SiteTypeId = (typeof siteTypes)[number]["id"];

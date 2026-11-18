@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { siteTypes, typeById } from "../data/catalog";
+import { api, ApiError } from "../lib/api";
 import { readDraft, writeDraft, type Draft } from "../lib/draft";
 
 const notes = [
@@ -41,10 +42,38 @@ export function ComposePage() {
   );
 }
 
+const fieldsByType = {
+  landing: [
+    { key: "name", label: "Tên sản phẩm", placeholder: "Serum AURA" },
+    { key: "headline", label: "Giá bán", placeholder: "890.000đ" },
+    { key: "about", label: "Lợi ích và đánh giá", placeholder: "Da sáng hơn sau 2 tuần. Khách nói dùng thấy khác.", area: true },
+    { key: "phone", label: "Zalo nhận form", placeholder: "0900 000 000" },
+  ],
+  company: [
+    { key: "name", label: "Tên công ty", placeholder: "Nova Legal" },
+    { key: "headline", label: "Câu trên trang chủ", placeholder: "Tư vấn pháp lý cho doanh nghiệp" },
+    { key: "about", label: "Dịch vụ và đội ngũ", placeholder: "Hợp đồng, sở hữu trí tuệ. Đội ngũ luật sư phụ trách.", area: true },
+    { key: "phone", label: "Số liên hệ", placeholder: "028 0000 0000" },
+  ],
+  saas: [
+    { key: "name", label: "Tên sản phẩm", placeholder: "Pulse Analytics" },
+    { key: "headline", label: "Câu giới thiệu", placeholder: "Xem số liệu kinh doanh trong một màn hình" },
+    { key: "about", label: "Tính năng và bảng giá", placeholder: "Báo cáo, cảnh báo. Miễn phí và gói 299.000đ/tháng.", area: true },
+    { key: "phone", label: "Lời đăng ký dùng thử", placeholder: "Dùng thử 14 ngày, không cần thẻ" },
+  ],
+  ecommerce: [
+    { key: "name", label: "Tên shop", placeholder: "Green Store" },
+    { key: "headline", label: "Danh mục chính", placeholder: "Rau củ, đồ khô, đồ uống" },
+    { key: "about", label: "Sản phẩm nổi bật", placeholder: "Rau organic 45.000đ, trà sen 89.000đ", area: true },
+    { key: "phone", label: "Thanh toán / COD", placeholder: "Giao nội thành, thu COD" },
+  ],
+} as const;
+
 export function ComposeFormPage() {
   const [draft, setDraft] = useState<Draft>(readDraft());
   const [saved, setSaved] = useState("");
   const type = typeById(draft.typeId);
+  const fields = fieldsByType[draft.typeId];
 
   function update(patch: Partial<Draft>) {
     const next = { ...draft, ...patch };
@@ -52,34 +81,57 @@ export function ComposeFormPage() {
     writeDraft(next);
   }
 
-  function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault();
     writeDraft(draft);
-    setSaved("Đã lưu thông tin.");
+    const lines = fields.map((field) => `${field.label}: ${draft[field.key].trim() || "(chưa nhập)"}`);
+    const body = [`Yêu cầu soạn ${type.name}`, ...lines].join("\n");
+    try {
+      await api("/api/chat", { method: "POST", body: JSON.stringify({ body }) });
+      setSaved("Đã lưu và gửi vào tin nhắn của admin.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Chưa gửi được tin nhắn.";
+      setSaved("Đã lưu trên máy. " + message);
+    }
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 text-[#1c1917]">
       <Link to="/soan" className="text-sm font-semibold text-stone-500">← Soạn</Link>
       <h1 className="text-2xl font-extrabold">{type.name}</h1>
-      <Field label="Tên website" value={draft.name} onChange={(name) => update({ name })} />
-      <Field label="Tiêu đề" value={draft.headline} onChange={(headline) => update({ headline })} />
-      <Field label="Số điện thoại / Zalo" value={draft.phone} onChange={(phone) => update({ phone })} />
-      <label className="block text-sm font-semibold">
-        Giới thiệu
-        <textarea className="mt-1 min-h-28 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3" value={draft.about} onChange={(e) => update({ about: e.target.value })} />
-      </label>
+      <p className="text-sm leading-6 text-stone-500">{type.note}</p>
+      {fields.map((field) =>
+        "area" in field ? (
+          <label key={field.key} className="block text-sm font-semibold">
+            {field.label}
+            <textarea
+              className="mt-1 min-h-28 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3"
+              placeholder={field.placeholder}
+              value={draft[field.key]}
+              onChange={(event) => update({ [field.key]: event.target.value })}
+            />
+          </label>
+        ) : (
+          <Field
+            key={field.key}
+            label={field.label}
+            placeholder={field.placeholder}
+            value={draft[field.key]}
+            onChange={(value) => update({ [field.key]: value })}
+          />
+        ),
+      )}
       {saved && <p className="text-sm text-emerald-700">{saved}</p>}
       <button className="w-full rounded-full bg-[#7c5cff] py-3 font-bold text-white">Lưu thông tin</button>
     </form>
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Field({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (value: string) => void }) {
   return (
     <label className="block text-sm font-semibold">
       {label}
-      <input className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3" value={value} onChange={(e) => onChange(e.target.value)} />
+      <input className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }

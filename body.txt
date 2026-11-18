@@ -1,0 +1,1 @@
+{"error":"Nhập họ tên, email hợp lệ và mật khẩu từ 8 ký tự."}

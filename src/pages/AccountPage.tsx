@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { typeById } from "../data/catalog";
 import { readDraft } from "../lib/draft";
@@ -8,12 +8,7 @@ import { ApiError, api } from "../lib/api";
 export function AccountPage() {
   const { user, loading, refresh } = useAuth();
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  useEffect(() => {
-    if (user) setName(user.name);
-  }, [user]);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const nick = localStorage.getItem("webstudio-nickname");
 
   if (loading) return <p>Đang tải…</p>;
   if (!user) {
@@ -29,31 +24,6 @@ export function AccountPage() {
         <Menu />
       </div>
     );
-  }
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await api("/api/me", { method: "PATCH", body: JSON.stringify({ name }) });
-      await refresh();
-      setMessage("Đã lưu tên hiển thị.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không lưu được.");
-    }
-  }
-
-  async function onAvatar(file: File | undefined) {
-    if (!file) return;
-    const form = new FormData();
-    form.set("file", file);
-    try {
-      await api("/api/me/avatar", { method: "POST", body: form });
-      await refresh();
-      setMessage("Đã lưu ảnh đại diện.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không tải ảnh được.");
-    }
   }
 
   async function logout() {
@@ -75,6 +45,7 @@ export function AccountPage() {
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-extrabold">{user.name}</h1>
+          {nick && <p className="text-sm text-[#7c5cff]">{nick}</p>}
           <p className="text-sm text-stone-500">{type.name} · {code}</p>
           <p className="text-xs text-stone-400">Đăng nhập: {user.email}</p>
         </div>
@@ -83,37 +54,117 @@ export function AccountPage() {
         </button>
       </section>
       <Menu />
-      <form onSubmit={save} className="space-y-3 rounded-[28px] bg-white p-4">
-        <label className="block text-sm font-semibold">
-          Hồ sơ — tên hiển thị
-          <input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={name} onChange={(e) => setName(e.target.value)} />
+    </div>
+  );
+}
+
+const NICK_KEY = "webstudio-nickname";
+
+export function ProfilePage() {
+  const { user, refresh } = useAuth();
+  const [name, setName] = useState(user?.name ?? "");
+  const [nick, setNick] = useState(() => localStorage.getItem(NICK_KEY) ?? "");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  if (!user) return null;
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    localStorage.setItem(NICK_KEY, nick.trim());
+    try {
+      await api("/api/me", { method: "PATCH", body: JSON.stringify({ name }) });
+      await refresh();
+      setMessage("Đã lưu tên và biệt danh.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Không lưu được.");
+    }
+  }
+
+  async function onAvatar(file: File | undefined) {
+    if (!file) return;
+    const form = new FormData();
+    form.set("file", file);
+    try {
+      await api("/api/me/avatar", { method: "POST", body: form });
+      await refresh();
+      setMessage("Đã đổi ảnh đại diện.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Không tải ảnh được. Ảnh cần nhỏ hơn 2MB.");
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-4 text-[#1c1917]">
+      <Link to="/tai-khoan" className="text-sm font-semibold text-stone-500">← Tôi</Link>
+      <h1 className="text-2xl font-extrabold">Hồ sơ</h1>
+      <div className="flex items-center gap-4 rounded-[28px] bg-white p-4">
+        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#7c5cff] text-xl font-bold text-white">
+          {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" /> : user.name.slice(0, 1)}
+        </div>
+        <label className="text-sm font-bold text-[#7c5cff]">
+          Thay avatar
+          <input className="sr-only" type="file" accept="image/*" onChange={(event) => void onAvatar(event.target.files?.[0])} />
         </label>
-        <label className="block text-sm font-semibold">
-          Ảnh đại diện
-          <input className="mt-1 block w-full text-sm" type="file" accept="image/*" onChange={(e) => void onAvatar(e.target.files?.[0])} />
-        </label>
-        {message && <p className="text-sm text-emerald-700">{message}</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="w-full rounded-full bg-[#7c5cff] py-3 font-bold text-white">Lưu hồ sơ</button>
-      </form>
+      </div>
+      <label className="block text-sm font-semibold">
+        Tên
+        <input className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3" value={name} onChange={(event) => setName(event.target.value)} />
+      </label>
+      <label className="block text-sm font-semibold">
+        Biệt danh
+        <input className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3" value={nick} onChange={(event) => setNick(event.target.value)} placeholder="Tên ngắn mọi người gọi bạn" />
+      </label>
+      {message && <p className="text-sm text-emerald-700">{message}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button className="w-full rounded-full bg-[#7c5cff] py-3 font-bold text-white">Lưu hồ sơ</button>
+    </form>
+  );
+}
+
+export function ThemePage() {
+  const current = localStorage.getItem("webstudio-theme") === "dark" ? "dark" : "light";
+  const [theme, setTheme] = useState(current);
+
+  function choose(next: "light" | "dark") {
+    localStorage.setItem("webstudio-theme", next);
+    document.documentElement.dataset.theme = next;
+    window.dispatchEvent(new Event("webstudio-theme"));
+    setTheme(next);
+  }
+
+  return (
+    <div className="space-y-4 text-[#1c1917]">
+      <Link to="/tai-khoan" className="text-sm font-semibold text-stone-500">← Tôi</Link>
+      <h1 className="text-2xl font-extrabold">Giao diện</h1>
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" onClick={() => choose("light")} className={`rounded-3xl bg-white p-4 text-left ${theme === "light" ? "ring-2 ring-[#7c5cff]" : ""}`}>
+          <span className="block h-16 rounded-2xl bg-[#f6f3ef]" />
+          <span className="mt-3 block font-extrabold">Sáng</span>
+        </button>
+        <button type="button" onClick={() => choose("dark")} className={`rounded-3xl bg-white p-4 text-left ${theme === "dark" ? "ring-2 ring-[#7c5cff]" : ""}`}>
+          <span className="block h-16 rounded-2xl bg-[#141210]" />
+          <span className="mt-3 block font-extrabold">Tối</span>
+        </button>
+      </div>
     </div>
   );
 }
 
 function Menu() {
   const rows = [
-    ["/tai-khoan", "Hồ sơ"],
-    ["/tai-khoan", "Giao diện"],
-    ["/toi/quyen-rieng-tu", "Quyền riêng tư"],
-    ["/tai-khoan", "Tài khoản và bảo mật"],
-    ["/toi/nha-phat-trien", "Nhà phát triển"],
-    ["/toi/gioi-thieu", "Giới thiệu"],
+    ["/toi/ho-so", "Hồ sơ", "Tên, biệt danh, avatar"],
+    ["/toi/giao-dien", "Giao diện", "Sáng hoặc tối"],
+    ["/toi/quyen-rieng-tu", "Quyền riêng tư", "Email và mật khẩu"],
+    ["/toi/nha-phat-trien", "Nhà phát triển", "Ứng dụng và dữ liệu"],
+    ["/toi/gioi-thieu", "Giới thiệu", "WebStudio làm gì"],
   ];
   return (
     <div className="overflow-hidden rounded-[28px] bg-white shadow-sm">
-      {rows.map(([to, label]) => (
-        <Link key={to} to={to} className="block border-b border-slate-100 px-5 py-4 font-semibold last:border-0">
-          {label}
+      {rows.map(([to, label, hint]) => (
+        <Link key={to} to={to} className="block border-b border-stone-100 px-5 py-4 last:border-0">
+          <span className="block font-semibold">{label}</span>
+          <span className="mt-1 block text-sm text-stone-500">{hint}</span>
         </Link>
       ))}
     </div>

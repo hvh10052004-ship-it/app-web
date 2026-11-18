@@ -1,0 +1,1 @@
+{"error":"Đăng nhập Google chưa được cấu hình. Thêm GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET trên Worker."}

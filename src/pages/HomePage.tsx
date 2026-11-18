@@ -57,6 +57,19 @@ export function HomePage() {
         </div>
       </section>
 
+      <section className="rounded-3xl bg-white p-4 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#7c5cff]">Chú thích tóm tắt</p>
+        <h2 className="mt-1 text-base font-extrabold">{current.name}</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">{current.note}</p>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {current.sections.map((section) => (
+            <li key={section} className="rounded-full bg-[#f3efff] px-3 py-1 text-xs font-semibold text-[#5b45c7]">
+              {section}
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section>
         <h2 className="mb-3 text-sm font-semibold text-stone-700">Đang soạn</h2>
         <article className="overflow-hidden rounded-[28px] bg-[#24211f] p-3 text-white">

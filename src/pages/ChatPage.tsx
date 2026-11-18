@@ -1,115 +1,110 @@
-import { FormEvent, useState } from "react";
-import { readDraft } from "../lib/draft";
-import { typeById } from "../data/catalog";
-
-type Room = { code: string; title: string; note: string };
-
-const CODE_KEY = "webstudio-share-code";
-const ROOM_KEY = "webstudio-rooms";
-
-function myCode() {
-  const current = localStorage.getItem(CODE_KEY);
-  if (current) return current;
-  const next = Math.random().toString(36).slice(2, 8).toUpperCase();
-  localStorage.setItem(CODE_KEY, next);
-  return next;
-}
-
-function readRooms(): Room[] {
-  try {
-    return JSON.parse(localStorage.getItem(ROOM_KEY) || "[]") as Room[];
-  } catch {
-    return [];
-  }
-}
+import { FormEvent, useEffect, useState } from "react";
+import { api } from "../lib/api";
+import type { ChatMessage, ChatThread } from "../lib/types";
+import { useAuth } from "../context/AuthContext";
 
 export function ChatPage() {
-  const draft = readDraft();
-  const type = typeById(draft.typeId);
-  const [code] = useState(myCode);
-  const [input, setInput] = useState("");
-  const [rooms, setRooms] = useState<Room[]>(readRooms);
-  const [copied, setCopied] = useState(false);
+  const { user } = useAuth();
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [text, setText] = useState("");
   const [error, setError] = useState("");
 
-  function save(next: Room[]) {
-    setRooms(next);
-    localStorage.setItem(ROOM_KEY, JSON.stringify(next));
+  async function load(userId?: string) {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    const data = await api<{ messages: ChatMessage[]; threads: ChatThread[]; isAdmin: boolean }>("/api/chat" + query);
+    setThreads(data.threads);
+    setMessages(data.messages);
+    return data;
   }
 
-  function connect(event: FormEvent) {
-    event.preventDefault();
-    const value = input.trim().toUpperCase();
-    if (!/^[A-Z0-9]{4,8}$/.test(value)) {
-      setError("Nhập mã từ 4 đến 8 ký tự.");
-      return;
-    }
+  useEffect(() => {
+    void load().catch(() => setError("Chưa tải được tin nhắn."));
+  }, []);
+
+  async function openThread(userId: string) {
+    setOpenId(userId);
     setError("");
-    if (!rooms.some((room) => room.code === value)) {
-      save([{ code: value, title: `Nhóm ${value}`, note: "Chưa có tin" }, ...rooms]);
+    try {
+      await load(user?.isAdmin ? userId : undefined);
+    } catch {
+      setError("Không mở được nội dung.");
     }
-    setInput("");
   }
 
-  function createRoom() {
-    const value = Math.random().toString(36).slice(2, 8).toUpperCase();
-    save([{ code: value, title: `Nhóm ${value}`, note: "Chưa có tin" }, ...rooms]);
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    const body = text.trim();
+    if (!body) return;
+    try {
+      await api("/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ body, userId: user?.isAdmin ? openId : undefined }),
+      });
+      setText("");
+      await load(user?.isAdmin ? openId ?? undefined : undefined);
+    } catch {
+      setError("Chưa gửi được.");
+    }
   }
+
+  const title = user?.isAdmin ? "Tin nhắn admin" : "Chat";
+  const openThreadInfo = threads.find((item) => item.id === openId);
 
   return (
     <div className="space-y-4 text-[#1c1917]">
       <header>
-        <h1 className="text-[28px] font-extrabold tracking-tight">Chat</h1>
-        <p className="mt-1 text-sm text-stone-500">Chia sẻ mã của bạn hoặc nhập mã để kết nối</p>
+        <h1 className="text-[28px] font-extrabold tracking-tight">{title}</h1>
+        <p className="mt-1 text-sm text-stone-500">
+          {user?.isAdmin ? "Bấm một khách để xem nội dung họ vừa soạn." : "Nội dung đã soạn sẽ nằm trong tin nhắn gửi admin."}
+        </p>
       </header>
-      <div className="flex items-center justify-between rounded-3xl bg-white px-4 py-3">
-        <div>
-          <p className="text-xs text-stone-400">Mã của bạn</p>
-          <p className="text-2xl font-extrabold tracking-[0.18em]">{code}</p>
-        </div>
-        <button
-          type="button"
-          className="rounded-2xl bg-[#8b6cff] px-4 py-3 text-sm font-bold text-white"
-          onClick={() => {
-            void navigator.clipboard?.writeText(code);
-            setCopied(true);
-          }}
-        >
-          {copied ? "Đã chép" : "Sao chép"}
-        </button>
-      </div>
-      <form onSubmit={connect} className="flex gap-2">
-        <input
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="NHẬP MÃ KẾT NỐI"
-          className="flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm uppercase"
-        />
-        <button className="rounded-2xl bg-[#8b6cff] px-4 text-sm font-bold text-white">Kết nối</button>
-      </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="button" onClick={createRoom} className="text-sm font-semibold text-[#5b4dff]">
-        Tạo nhóm và lấy mã chia sẻ
-      </button>
-      <div className="space-y-4">
-        <Row badge="S" title={type.name} note="Chat cùng người soạn website này" side="Nhóm site" />
-        {rooms.map((room) => (
-          <Row key={room.code} badge="N" title={room.title} note={room.note} side={room.code} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
-function Row({ badge, title, note, side }: { badge: string; title: string; note: string; side: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#efeaff] font-bold text-[#7c5cff]">{badge}</span>
-      <div className="min-w-0 flex-1">
-        <p className="font-extrabold">{title}</p>
-        <p className="text-sm text-stone-500">{note}</p>
-      </div>
-      <span className="text-xs text-stone-400">{side}</span>
+      {user?.isAdmin && !openId && (
+        <div className="overflow-hidden rounded-[28px] bg-white">
+          {threads.length === 0 && <p className="px-4 py-5 text-sm text-stone-500">Chưa có tin. Khi khách bấm Lưu thông tin, tin sẽ hiện ở đây.</p>}
+          {threads.map((thread) => (
+            <button key={thread.id} type="button" onClick={() => void openThread(thread.id)} className="block w-full border-b border-stone-100 px-4 py-4 text-left last:border-0">
+              <span className="block font-extrabold">{thread.name}</span>
+              <span className="mt-1 block text-sm text-stone-500">{thread.email}</span>
+              <span className="mt-1 block truncate text-sm text-stone-400">{thread.last_body || "Chưa có nội dung"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!user?.isAdmin && !openId && (
+        <button type="button" onClick={() => void openThread(user?.id || "")} className="block w-full rounded-[28px] bg-white px-4 py-4 text-left">
+          <span className="block font-extrabold">Tin nhắn với admin</span>
+          <span className="mt-1 block text-sm text-stone-500">
+            {messages.at(-1)?.body || "Bấm để xem nội dung đã gửi sau khi soạn"}
+          </span>
+        </button>
+      )}
+
+      {openId && (
+        <div className="space-y-3">
+          <button type="button" onClick={() => setOpenId(null)} className="text-sm font-semibold text-stone-500">
+            ← Danh sách
+          </button>
+          <h2 className="text-lg font-extrabold">{user?.isAdmin ? openThreadInfo?.name || "Khách" : "Nội dung đã gửi"}</h2>
+          <div className="space-y-2">
+            {messages.length === 0 && <p className="text-sm text-stone-500">Chưa có nội dung.</p>}
+            {messages.map((message) => (
+              <article key={message.id} className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${message.sender_role === "admin" ? "bg-[#efeaff]" : "bg-white"}`}>
+                <p className="mb-1 text-xs font-semibold text-stone-400">{message.sender_role === "admin" ? "Admin" : "Khách"}</p>
+                {message.body}
+              </article>
+            ))}
+          </div>
+          <form onSubmit={(event) => void send(event)} className="flex gap-2">
+            <input value={text} onChange={(event) => setText(event.target.value)} placeholder="Trả lời" className="flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm" />
+            <button className="rounded-2xl bg-[#8b6cff] px-4 text-sm font-bold text-white">Gửi</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
