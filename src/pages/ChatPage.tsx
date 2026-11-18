@@ -1,88 +1,115 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { ApiError, api } from "../lib/api";
-import type { ChatMessage, ChatThread } from "../lib/types";
+import { FormEvent, useState } from "react";
+import { readDraft } from "../lib/draft";
+import { typeById } from "../data/catalog";
+
+type Room = { code: string; title: string; note: string };
+
+const CODE_KEY = "webstudio-share-code";
+const ROOM_KEY = "webstudio-rooms";
+
+function myCode() {
+  const current = localStorage.getItem(CODE_KEY);
+  if (current) return current;
+  const next = Math.random().toString(36).slice(2, 8).toUpperCase();
+  localStorage.setItem(CODE_KEY, next);
+  return next;
+}
+
+function readRooms(): Room[] {
+  try {
+    return JSON.parse(localStorage.getItem(ROOM_KEY) || "[]") as Room[];
+  } catch {
+    return [];
+  }
+}
 
 export function ChatPage() {
-  const { user, loading } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [threadId, setThreadId] = useState("");
-  const [text, setText] = useState("");
+  const draft = readDraft();
+  const type = typeById(draft.typeId);
+  const [code] = useState(myCode);
+  const [input, setInput] = useState("");
+  const [rooms, setRooms] = useState<Room[]>(readRooms);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
-  async function load(activeThread = threadId) {
-    const query = activeThread ? `?userId=${encodeURIComponent(activeThread)}` : "";
-    const data = await api<{ messages: ChatMessage[]; threads: ChatThread[] }>(`/api/chat${query}`);
-    setMessages(data.messages);
-    setThreads(data.threads);
+  function save(next: Room[]) {
+    setRooms(next);
+    localStorage.setItem(ROOM_KEY, JSON.stringify(next));
   }
 
-  useEffect(() => {
-    if (!user) return;
-    void load().catch(() => setError("Chưa kết nối được cuộc trò chuyện. Hãy bật API local."));
-    const timer = window.setInterval(() => {
-      void load().catch(() => undefined);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [user, threadId]);
-
-  async function onSubmit(event: FormEvent) {
+  function connect(event: FormEvent) {
     event.preventDefault();
-    if (!text.trim()) return;
-    try {
-      await api("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ body: text, userId: threadId || undefined }),
-      });
-      setText("");
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không gửi được.");
+    const value = input.trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,8}$/.test(value)) {
+      setError("Nhập mã từ 4 đến 8 ký tự.");
+      return;
     }
+    setError("");
+    if (!rooms.some((room) => room.code === value)) {
+      save([{ code: value, title: `Nhóm ${value}`, note: "Chưa có tin" }, ...rooms]);
+    }
+    setInput("");
   }
 
-  if (loading) return <p>Đang tải…</p>;
-  if (!user) {
-    return (
-      <Link to="/dang-nhap" className="block rounded-3xl bg-white p-5 font-bold shadow-sm">
-        Đăng nhập để chat
-      </Link>
-    );
+  function createRoom() {
+    const value = Math.random().toString(36).slice(2, 8).toUpperCase();
+    save([{ code: value, title: `Nhóm ${value}`, note: "Chưa có tin" }, ...rooms]);
   }
 
   return (
-    <div className="flex h-[70vh] flex-col rounded-[28px] bg-white p-3 shadow-sm">
-      <h1 className="px-2 py-2 text-xl font-extrabold">{user.isAdmin ? "Chat quản trị" : "Chat với WebStudio"}</h1>
-      {user.isAdmin && (
-        <select className="mx-2 mb-2 rounded-2xl border border-slate-200 px-3 py-2" value={threadId} onChange={(e) => setThreadId(e.target.value)}>
-          <option value="">Chọn khách hàng</option>
-          {threads.map((thread) => (
-            <option key={thread.id} value={thread.id}>
-              {thread.name} — {thread.last_body || "Chưa có tin"}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="flex-1 space-y-2 overflow-auto px-2">
-        {messages.map((message) => (
-          <p
-            key={message.id}
-            className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-              message.sender_role === "admin" ? "bg-slate-100" : "ml-auto bg-[#102033] text-white"
-            }`}
-          >
-            {message.body}
-          </p>
-        ))}
-        {messages.length === 0 && <p className="text-sm text-slate-400">Chưa có tin nhắn.</p>}
+    <div className="space-y-4 text-[#1c1917]">
+      <header>
+        <h1 className="text-[28px] font-extrabold tracking-tight">Chat</h1>
+        <p className="mt-1 text-sm text-stone-500">Chia sẻ mã của bạn hoặc nhập mã để kết nối</p>
+      </header>
+      <div className="flex items-center justify-between rounded-3xl bg-white px-4 py-3">
+        <div>
+          <p className="text-xs text-stone-400">Mã của bạn</p>
+          <p className="text-2xl font-extrabold tracking-[0.18em]">{code}</p>
+        </div>
+        <button
+          type="button"
+          className="rounded-2xl bg-[#8b6cff] px-4 py-3 text-sm font-bold text-white"
+          onClick={() => {
+            void navigator.clipboard?.writeText(code);
+            setCopied(true);
+          }}
+        >
+          {copied ? "Đã chép" : "Sao chép"}
+        </button>
       </div>
-      {error && <p className="px-2 text-sm text-red-600">{error}</p>}
-      <form onSubmit={onSubmit} className="mt-2 flex gap-2">
-        <input className="flex-1 rounded-full border border-slate-200 px-4 py-3" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nhập tin nhắn" />
-        <button className="rounded-full bg-[#102033] px-4 font-bold text-white">Gửi</button>
+      <form onSubmit={connect} className="flex gap-2">
+        <input
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="NHẬP MÃ KẾT NỐI"
+          className="flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm uppercase"
+        />
+        <button className="rounded-2xl bg-[#8b6cff] px-4 text-sm font-bold text-white">Kết nối</button>
       </form>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="button" onClick={createRoom} className="text-sm font-semibold text-[#5b4dff]">
+        Tạo nhóm và lấy mã chia sẻ
+      </button>
+      <div className="space-y-4">
+        <Row badge="S" title={type.name} note="Chat cùng người soạn website này" side="Nhóm site" />
+        {rooms.map((room) => (
+          <Row key={room.code} badge="N" title={room.title} note={room.note} side={room.code} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Row({ badge, title, note, side }: { badge: string; title: string; note: string; side: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#efeaff] font-bold text-[#7c5cff]">{badge}</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-extrabold">{title}</p>
+        <p className="text-sm text-stone-500">{note}</p>
+      </div>
+      <span className="text-xs text-stone-400">{side}</span>
     </div>
   );
 }

@@ -34,4 +34,17 @@ export function readDraft(): Draft {
 
 export function writeDraft(next: Draft) {
   localStorage.setItem(KEY, JSON.stringify(next));
+  const saved = readSaved();
+  saved[next.typeId] = Boolean(next.headline.trim() || next.about.trim());
+  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+}
+
+const SAVED_KEY = "webstudio-saved-types";
+
+export function readSaved(): Partial<Record<SiteTypeId, boolean>> {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_KEY) || "{}") as Partial<Record<SiteTypeId, boolean>>;
+  } catch {
+    return {};
+  }
 }

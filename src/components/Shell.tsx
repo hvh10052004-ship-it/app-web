@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 
 const links = [
   { to: "/", label: "Trang chủ", end: true, icon: "home" },
@@ -10,18 +10,10 @@ const links = [
 ];
 
 export function Shell() {
-  const location = useLocation();
-  const home = location.pathname === "/";
-
   return (
-    <div className={`min-h-screen ${home ? "bg-[#f6f3ef] text-[#1c1917]" : "bg-[#e7eef8] text-[#102033]"}`}>
+    <div className="min-h-screen bg-[#f6f3ef] text-[#1c1917]">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-        {!home && (
-          <header className="px-4 pt-5 pb-3">
-            <p className="text-lg font-extrabold tracking-tight">WebStudio</p>
-          </header>
-        )}
-        <main className={`flex-1 px-4 pb-28 ${home ? "pt-5" : ""}`}>
+        <main className="flex-1 px-4 pt-5 pb-28">
           <Outlet />
         </main>
         <nav className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-stone-200 bg-white px-1 py-2">

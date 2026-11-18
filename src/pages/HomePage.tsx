@@ -83,9 +83,18 @@ export function HomePage() {
             <Link to="/soan" className="rounded-2xl bg-[#8b6cff] py-3 text-center text-sm font-bold">Tiếp tục soạn</Link>
           </div>
         </article>
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm">
-          <span className="font-semibold">{current.sections[0]}</span>
-          <span className="text-stone-400">{progress === 100 ? "Đủ" : "Thiếu"}</span>
+        <div className="mt-3 space-y-2">
+          {current.sections.map((section) => (
+            <div key={section} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm">
+              <span className="flex items-center gap-3 font-semibold">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#f6f3ef] text-stone-500">
+                  <TypeIcon name="bag" />
+                </span>
+                {section}
+              </span>
+              <span className="text-stone-400">{progress === 100 ? "Đủ" : "Thiếu"}</span>
+            </div>
+          ))}
         </div>
       </section>
     </div>

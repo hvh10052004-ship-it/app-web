@@ -17,6 +17,7 @@ export function LoginPage() {
     try {
       await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
       await refresh();
+      sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không đăng nhập được.");
@@ -52,6 +53,7 @@ export function RegisterPage() {
     try {
       await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
       await refresh();
+      sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không tạo được tài khoản.");
