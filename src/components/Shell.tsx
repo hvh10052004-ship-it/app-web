@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigationType } from "react-router-dom";
 
 const links = [
   { to: "/", label: "Trang chủ", end: true, icon: "home" },
@@ -11,7 +11,18 @@ const links = [
 ];
 
 export function Shell() {
+  const location = useLocation();
+  const navType = useNavigationType();
+  const skipMotion = useRef(true);
+  const previousPath = useRef(location.pathname);
+  const from = previousPath.current;
+  const depth = (path: string) => path.split("/").filter(Boolean).length;
+  const goingBack = navType === "POP" || depth(location.pathname) < depth(from);
+  if (from !== location.pathname) previousPath.current = location.pathname;
   const [dark, setDark] = useState(() => localStorage.getItem("webstudio-theme") === "dark");
+  useEffect(() => {
+    skipMotion.current = false;
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     function sync() {
@@ -23,8 +34,10 @@ export function Shell() {
   return (
     <div className={`min-h-screen ${dark ? "bg-[#141210] text-[#f6f3ef]" : "bg-[#f6f3ef] text-[#1c1917]"}`}>
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-        <main className="flex-1 px-4 pt-5 pb-28">
-          <Outlet />
+        <main className="flex-1 overflow-x-hidden px-4 pt-5 pb-28">
+          <div key={location.pathname} className={skipMotion.current ? "" : goingBack ? "page-back" : "page-forward"}>
+            <Outlet />
+          </div>
         </main>
         <nav className={`fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t px-1 py-2 ${dark ? "border-stone-700 bg-[#1c1917]" : "border-stone-200 bg-white"}`}>
           <ul className="grid grid-cols-6 text-center text-[10px] font-semibold text-stone-400">

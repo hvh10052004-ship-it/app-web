@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { typeById } from "../data/catalog";
 import { readDraft } from "../lib/draft";
@@ -126,11 +126,26 @@ export function ThemePage() {
   const current = localStorage.getItem("webstudio-theme") === "dark" ? "dark" : "light";
   const [theme, setTheme] = useState(current);
 
-  function choose(next: "light" | "dark") {
-    localStorage.setItem("webstudio-theme", next);
-    document.documentElement.dataset.theme = next;
-    window.dispatchEvent(new Event("webstudio-theme"));
-    setTheme(next);
+  function choose(next: "light" | "dark", event: MouseEvent<HTMLButtonElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const size = Math.hypot(window.innerWidth, window.innerHeight) * 2.2;
+    const wave = document.createElement("span");
+    wave.className = "theme-ripple";
+    wave.dataset.mode = next;
+    wave.style.left = `${x}px`;
+    wave.style.top = `${y}px`;
+    wave.style.width = `${size}px`;
+    wave.style.height = `${size}px`;
+    document.body.appendChild(wave);
+    window.setTimeout(() => {
+      localStorage.setItem("webstudio-theme", next);
+      document.documentElement.dataset.theme = next;
+      window.dispatchEvent(new Event("webstudio-theme"));
+      setTheme(next);
+    }, 180);
+    wave.addEventListener("animationend", () => wave.remove());
   }
 
   return (
@@ -138,12 +153,12 @@ export function ThemePage() {
       <Link to="/tai-khoan" className="text-sm font-semibold text-stone-500">← Tôi</Link>
       <h1 className="text-2xl font-extrabold">Giao diện</h1>
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" onClick={() => choose("light")} className={`rounded-3xl bg-white p-4 text-left ${theme === "light" ? "ring-2 ring-[#7c5cff]" : ""}`}>
-          <span className="block h-16 rounded-2xl bg-[#f6f3ef]" />
+        <button type="button" onClick={(event) => choose("light", event)} className={`rounded-3xl bg-white p-4 text-left ${theme === "light" ? "ring-2 ring-[#7c5cff]" : ""}`}>
+          <span className="theme-swatch block h-16 rounded-2xl" style={{ background: "#f6f3ef" }} />
           <span className="mt-3 block font-extrabold">Sáng</span>
         </button>
-        <button type="button" onClick={() => choose("dark")} className={`rounded-3xl bg-white p-4 text-left ${theme === "dark" ? "ring-2 ring-[#7c5cff]" : ""}`}>
-          <span className="block h-16 rounded-2xl bg-[#141210]" />
+        <button type="button" onClick={(event) => choose("dark", event)} className={`rounded-3xl bg-white p-4 text-left ${theme === "dark" ? "ring-2 ring-[#7c5cff]" : ""}`}>
+          <span className="theme-swatch block h-16 rounded-2xl" style={{ background: "#141210" }} />
           <span className="mt-3 block font-extrabold">Tối</span>
         </button>
       </div>
