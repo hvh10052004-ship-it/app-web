@@ -98,36 +98,35 @@ async function ensureSchema(env: Env) {
 
 async function register(request: Request, env: Env) {
   const body = await readJson(request);
-  const username = cleanUsername(body.username);
+  const email = cleanEmail(body.email);
+  const name = String(body.name ?? "").trim();
   const password = String(body.password ?? "");
-  if (!username || password.length < 8) {
-    return json({ error: "Tên tài khoản từ 3 đến 30 ký tự, không có khoảng trắng. Mật khẩu từ 8 ký tự." }, 400);
+  if (!email || !name || password.length < 8) {
+    return json({ error: "Nhập họ tên, email hợp lệ và mật khẩu từ 8 ký tự." }, 400);
   }
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(username).first();
-  if (existing) return json({ error: "Tên tài khoản này đã được dùng." }, 409);
+  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+  if (existing) return json({ error: "Email này đã có tài khoản." }, 409);
   const id = crypto.randomUUID();
   const { hash, salt } = await hashPassword(password);
   await env.DB.prepare(
     "INSERT INTO users (id, email, name, password_hash, password_salt, provider, created_at) VALUES (?, ?, ?, ?, ?, 'password', ?)",
   )
-    .bind(id, username, username, hash, salt, new Date().toISOString())
+    .bind(id, email, name, hash, salt, new Date().toISOString())
     .run();
   return withSession(env, id, json({ ok: true }));
 }
 
 async function login(request: Request, env: Env) {
   const body = await readJson(request);
-  const username = cleanUsername(body.username);
+  const email = cleanEmail(body.email);
   const password = String(body.password ?? "");
-  const user = username
-    ? await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(username).first<UserRow>()
-    : null;
+  const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<UserRow>();
   if (!user?.password_hash || !user.password_salt) {
-    return json({ error: "Tên tài khoản hoặc mật khẩu chưa đúng." }, 401);
+    return json({ error: "Email hoặc mật khẩu chưa đúng." }, 401);
   }
   const { hash } = await hashPassword(password, fromHex(user.password_salt));
   if (!safeEqual(hash, user.password_hash)) {
-    return json({ error: "Tên tài khoản hoặc mật khẩu chưa đúng." }, 401);
+    return json({ error: "Email hoặc mật khẩu chưa đúng." }, 401);
   }
   return withSession(env, user.id, json({ ok: true }));
 }
@@ -438,11 +437,6 @@ function appOrigin(request: Request, env: Env) {
   const requestOrigin = new URL(request.url).origin;
   if (requestOrigin.startsWith("https://")) return requestOrigin;
   return (env.APP_ORIGIN || requestOrigin).replace(/\/$/, "");
-}
-
-function cleanUsername(value: unknown) {
-  const name = String(value ?? "").trim().toLowerCase();
-  return /^[^\s@]{3,30}$/.test(name) ? name : "";
 }
 
 function cleanEmail(value: unknown) {
