@@ -3,10 +3,10 @@ import { useAuth } from "../context/AuthContext";
 
 const links = [
   { to: "/", label: "Trang chủ", end: true },
-  { to: "/mau", label: "Kho mẫu" },
-  { to: "/yeu-cau", label: "Yêu cầu" },
-  { to: "/chat", label: "Chat" },
-  { to: "/tai-khoan", label: "Tài khoản" },
+  { to: "/mau", label: "Kho mẫu", end: false },
+  { to: "/yeu-cau", label: "Yêu cầu", end: false },
+  { to: "/chat", label: "Chat", end: false },
+  { to: "/tai-khoan", label: "Tài khoản", end: false },
 ];
 
 export function Shell() {
@@ -27,7 +27,7 @@ export function Shell() {
             Dự án
           </NavLink>
         </header>
-        <main className="flex-1 px-4 pb-24">
+        <main className="flex-1 px-4 pb-32">
           <Outlet />
         </main>
         <nav className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-white/70 bg-white/90 px-2 py-2 backdrop-blur">

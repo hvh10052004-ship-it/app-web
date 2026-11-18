@@ -7,6 +7,10 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: "#0c1222",
   },
+  server: {
+    url: "https://app-web.hvh10052004.workers.dev",
+    androidScheme: "https",
+  },
 };
 
 export default config;

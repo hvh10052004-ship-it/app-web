@@ -24,6 +24,7 @@ export function AccountPage() {
         <Link to="/dang-ky" className="block rounded-full border border-slate-200 py-3 text-center font-bold">
           Tạo tài khoản
         </Link>
+        <Menu />
       </div>
     );
   }
@@ -89,6 +90,26 @@ export function AccountPage() {
           Đăng xuất
         </button>
       </form>
+      <Menu />
+    </div>
+  );
+}
+
+function Menu() {
+  const rows = [
+    ["/du-an", "Lịch sử dự án"],
+    ["/yeu-cau", "Gửi yêu cầu"],
+    ["/toi/quyen-rieng-tu", "Quyền riêng tư"],
+    ["/toi/gioi-thieu", "Giới thiệu"],
+    ["/toi/nha-phat-trien", "Nhà phát triển"],
+  ];
+  return (
+    <div className="overflow-hidden rounded-[28px] bg-white shadow-sm">
+      {rows.map(([to, label]) => (
+        <Link key={to} to={to} className="block border-b border-slate-100 px-5 py-4 font-semibold last:border-0">
+          {label}
+        </Link>
+      ))}
     </div>
   );
 }

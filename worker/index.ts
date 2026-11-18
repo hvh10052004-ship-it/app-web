@@ -26,6 +26,12 @@ const STATE_COOKIE = "ws_google_state";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === "OPTIONS") return withCors(new Response(null, { status: 204 }), request);
+    return withCors(await handle(request, env), request);
+  },
+};
+
+async function handle(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api")) {
       return json({ error: "Không tìm thấy." }, 404);
@@ -78,8 +84,7 @@ export default {
       const message = error instanceof Error ? error.message : "Lỗi máy chủ.";
       return json({ error: message }, 500);
     }
-  },
-};
+}
 
 async function ensureSchema(env: Env) {
   const statements = schema
@@ -406,7 +411,19 @@ function fromHex(hex: string) {
 }
 
 function cookie(name: string, value: string, maxAge: number) {
-  return `${name}=${value}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+  return `${name}=${value}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${maxAge}`;
+}
+
+function withCors(response: Response, request: Request) {
+  const origin = request.headers.get("Origin");
+  if (!origin) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+  headers.set("Vary", "Origin");
+  return new Response(response.body, { status: response.status, headers });
 }
 
 function clearCookie(name: string) {
