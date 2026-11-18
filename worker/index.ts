@@ -336,7 +336,7 @@ async function googleCallback(request: Request, env: Env) {
   await env.DB.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)")
     .bind(token, user.id, expires)
     .run();
-  const headers = new Headers({ Location: `${origin}/` });
+  const headers = new Headers({ Location: `${origin}/dang-nhap?google=1` });
   headers.append("Set-Cookie", cookie(COOKIE, token, 60 * 60 * 24 * 14));
   headers.append("Set-Cookie", clearCookie(STATE_COOKIE));
   return new Response(null, { status: 302, headers });
@@ -386,7 +386,7 @@ async function hashPassword(password: string, salt = crypto.getRandomValues(new 
     "deriveBits",
   ]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations: 10_000, hash: "SHA-256" },
     key,
     256,
   );
@@ -437,7 +437,9 @@ function readCookie(request: Request, name: string) {
 }
 
 function appOrigin(request: Request, env: Env) {
-  return (env.APP_ORIGIN || new URL(request.url).origin).replace(/\/$/, "");
+  const requestOrigin = new URL(request.url).origin;
+  if (requestOrigin.startsWith("https://")) return requestOrigin;
+  return (env.APP_ORIGIN || requestOrigin).replace(/\/$/, "");
 }
 
 function cleanEmail(value: unknown) {

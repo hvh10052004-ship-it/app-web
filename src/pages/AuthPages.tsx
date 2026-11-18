@@ -1,12 +1,18 @@
-import { FormEvent, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, api } from "../lib/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const [params] = useSearchParams();
+  useEffect(() => {
+    if (params.get("google") === "1" && user) {
+      sessionStorage.setItem("webstudio-gate", "1");
+      navigate("/");
+    }
+  }, [user, params, navigate]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(params.get("loi") === "google" ? "Đăng nhập Google chưa hoàn tất." : "");
@@ -32,6 +38,9 @@ export function LoginPage() {
       <a href="/api/auth/google" className="block rounded-full border border-slate-200 py-3 text-center font-semibold">
         Tiếp tục với Google
       </a>
+      <p className="text-center text-xs leading-5 text-stone-500">
+        Nút này chỉ chạy sau khi Worker có GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET. Không ghi hai giá trị đó vào mã nguồn.
+      </p>
       <Link to="/dang-ky" className="block text-center text-sm font-semibold text-slate-500">
         Chưa có tài khoản? Đăng ký
       </Link>

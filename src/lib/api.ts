@@ -20,7 +20,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as T & { error?: string }) : ({} as T & { error?: string });
+  let data: T & { error?: string };
+  try {
+    data = text ? (JSON.parse(text) as T & { error?: string }) : ({} as T & { error?: string });
+  } catch {
+    throw new ApiError("Máy chủ lỗi, chưa tạo được tài khoản. Hãy triển khai lại bản mới.", response.status);
+  }
   if (!response.ok) throw new ApiError(data.error || "Không gọi được máy chủ.", response.status);
   return data;
 }
