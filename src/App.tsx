@@ -15,9 +15,8 @@ import { ViewDetailPage, ViewPage } from "./pages/ViewPage";
 
 function RequireAuth() {
   const { user, loading } = useAuth();
-  const entered = sessionStorage.getItem("webstudio-gate") === "1";
   if (loading) return <p className="p-6 text-sm text-stone-500">Đang mở đăng nhập…</p>;
-  if (!entered || !user) return <Navigate to="/dang-nhap" replace />;
+  if (!user) return <Navigate to="/dang-nhap" replace />;
   return <Outlet />;
 }
 

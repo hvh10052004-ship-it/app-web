@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { typeById } from "../data/catalog";
 import { readDraft } from "../lib/draft";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, api } from "../lib/api";
+import { ApiError, api, clearSession } from "../lib/api";
 
 export function AccountPage() {
   const { user, loading, refresh } = useAuth();
@@ -28,7 +28,7 @@ export function AccountPage() {
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" });
-    sessionStorage.removeItem("webstudio-gate");
+    clearSession();
     await refresh();
     navigate("/");
   }

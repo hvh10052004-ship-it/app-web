@@ -20,10 +20,18 @@ export type Project = {
 
 export type ChatMessage = {
   id: string;
-  thread_user_id: string;
+  thread_user_id?: string;
   sender_role: "customer" | "admin";
+  sender_name?: string | null;
   body: string;
   created_at: string;
+};
+
+export type ChatGroup = {
+  id: string;
+  code: string;
+  title: string;
+  last_body?: string | null;
 };
 
 export type ChatThread = {

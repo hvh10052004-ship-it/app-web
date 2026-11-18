@@ -1,18 +1,15 @@
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, api } from "../lib/api";
+import { ApiError, api, saveSession } from "../lib/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { user, refresh } = useAuth();
   const [params] = useSearchParams();
   useEffect(() => {
-    if (params.get("google") === "1" && user) {
-      sessionStorage.setItem("webstudio-gate", "1");
-      navigate("/");
-    }
-  }, [user, params, navigate]);
+    if (user) navigate("/");
+  }, [user, navigate]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(params.get("loi") === "google" ? "Đăng nhập Google chưa hoàn tất." : "");
@@ -21,9 +18,9 @@ export function LoginPage() {
     event.preventDefault();
     setError("");
     try {
-      await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      const data = await api<{ token?: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      if (data.token) saveSession(data.token);
       await refresh();
-      sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không đăng nhập được.");
@@ -54,9 +51,9 @@ export function RegisterPage() {
     event.preventDefault();
     setError("");
     try {
-      await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
+      const data = await api<{ token?: string }>("/api/auth/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
+      if (data.token) saveSession(data.token);
       await refresh();
-      sessionStorage.setItem("webstudio-gate", "1");
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không tạo được tài khoản.");

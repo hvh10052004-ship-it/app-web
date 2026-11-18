@@ -19,6 +19,7 @@ type UserRow = {
   google_sub: string | null;
   avatar_key: string | null;
   created_at: string;
+  is_admin?: number;
 };
 
 const COOKIE = "ws_session";
@@ -76,6 +77,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
       if (url.pathname === "/api/projects" && request.method === "GET") {
         return listProjects(request, env);
       }
+      if (url.pathname === "/api/groups" && request.method === "POST") {
+        return createGroup(request, env);
+      }
+      if (url.pathname === "/api/groups/join" && request.method === "POST") {
+        return joinGroup(request, env);
+      }
       if (url.pathname === "/api/chat" && request.method === "GET") {
         return listChat(request, env, url);
       }
@@ -97,6 +104,37 @@ async function ensureSchema(env: Env) {
   for (const statement of statements) {
     await env.DB.prepare(statement).run();
   }
+  try {
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0").run();
+  } catch {
+    // Cột đã có.
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS groups (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS group_members (
+      group_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      PRIMARY KEY (group_id, user_id)
+    )`,
+  ).run();
+  try {
+    await env.DB.prepare("ALTER TABLE messages ADD COLUMN group_id TEXT").run();
+  } catch {
+    // Cột đã có.
+  }
+}
+
+const ADMIN_ORIGIN = "https://webstudio-admin.hvh10052004.workers.dev";
+
+function fromAdminApp(request: Request) {
+  return request.headers.get("Origin") === ADMIN_ORIGIN;
 }
 
 async function register(request: Request, env: Env) {
@@ -116,7 +154,11 @@ async function register(request: Request, env: Env) {
   )
     .bind(id, email, name, hash, salt, new Date().toISOString())
     .run();
-  return withSession(env, id, json({ ok: true }));
+  if (fromAdminApp(request)) {
+    await env.DB.prepare("UPDATE users SET is_admin = 1 WHERE id = ?").bind(id).run();
+  }
+  const token = await openSession(env, id);
+  return json({ ok: true, token }, 200, sessionCookie(token));
 }
 
 async function login(request: Request, env: Env) {
@@ -131,11 +173,15 @@ async function login(request: Request, env: Env) {
   if (!safeEqual(hash, user.password_hash)) {
     return json({ error: "Email hoặc mật khẩu chưa đúng." }, 401);
   }
-  return withSession(env, user.id, json({ ok: true }));
+  if (fromAdminApp(request)) {
+    await env.DB.prepare("UPDATE users SET is_admin = 1 WHERE id = ?").bind(user.id).run();
+  }
+  const token = await openSession(env, user.id);
+  return json({ ok: true, token }, 200, sessionCookie(token));
 }
 
 async function logout(request: Request, env: Env) {
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   if (token) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
   return json({ ok: true }, 200, clearCookie(COOKIE));
 }
@@ -250,13 +296,33 @@ async function listProjects(request: Request, env: Env) {
 async function listChat(request: Request, env: Env, url: URL) {
   const user = await currentUser(request, env);
   if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+  const groupId = url.searchParams.get("groupId");
+  const groups = await listVisibleGroups(env, user);
+  if (groupId) {
+    if (!isAdmin(user, env)) {
+      const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?")
+        .bind(groupId, user.id)
+        .first();
+      if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
+    }
+    const messages = await env.DB.prepare(
+      `SELECT m.id, m.sender_role, m.body, m.created_at, u.name AS sender_name
+       FROM messages m LEFT JOIN users u ON u.id = m.sender_id
+       WHERE m.group_id = ? ORDER BY m.created_at ASC`,
+    )
+      .bind(groupId)
+      .all();
+    return json({ messages: messages.results ?? [], groups, isAdmin: isAdmin(user, env) });
+  }
   const requested = url.searchParams.get("userId");
   const threadUserId = isAdmin(user, env) && requested ? requested : user.id;
   if (!isAdmin(user, env) && threadUserId !== user.id) {
     return json({ error: "Không có quyền." }, 403);
   }
   const messages = await env.DB.prepare(
-    "SELECT id, thread_user_id, sender_role, body, created_at FROM messages WHERE thread_user_id = ? ORDER BY created_at ASC",
+    `SELECT m.id, m.thread_user_id, m.sender_role, m.body, m.created_at, u.name AS sender_name
+     FROM messages m LEFT JOIN users u ON u.id = m.sender_id
+     WHERE m.thread_user_id = ? AND m.group_id IS NULL ORDER BY m.created_at ASC`,
   )
     .bind(threadUserId)
     .all();
@@ -264,14 +330,51 @@ async function listChat(request: Request, env: Env, url: URL) {
   if (isAdmin(user, env)) {
     const rows = await env.DB.prepare(
       `SELECT u.id, u.name, u.email,
-        (SELECT body FROM messages m WHERE m.thread_user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_body
+        (SELECT body FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_body
        FROM users u
-       WHERE u.id IN (SELECT DISTINCT thread_user_id FROM messages)
+       WHERE u.is_admin = 0 AND u.id IN (SELECT DISTINCT thread_user_id FROM messages WHERE group_id IS NULL)
        ORDER BY u.created_at DESC`,
     ).all();
     threads = rows.results ?? [];
   }
-  return json({ messages: messages.results ?? [], threads, isAdmin: isAdmin(user, env) });
+  return json({ messages: messages.results ?? [], threads, groups, isAdmin: isAdmin(user, env) });
+}
+
+async function listVisibleGroups(env: Env, user: UserRow) {
+  const query = isAdmin(user, env)
+    ? `SELECT g.id, g.code, g.title,
+        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body
+       FROM groups g ORDER BY g.created_at DESC`
+    : `SELECT g.id, g.code, g.title,
+        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body
+       FROM groups g JOIN group_members gm ON gm.group_id = g.id
+       WHERE gm.user_id = ? ORDER BY g.created_at DESC`;
+  const statement = env.DB.prepare(query);
+  const rows = isAdmin(user, env) ? await statement.all() : await statement.bind(user.id).all();
+  return rows.results ?? [];
+}
+
+async function createGroup(request: Request, env: Env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+  const body = await readJson(request);
+  const title = String(body.title ?? "Nhóm với admin").trim().slice(0, 40) || "Nhóm với admin";
+  const id = crypto.randomUUID();
+  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+  await env.DB.prepare("INSERT INTO groups (id, code, title, created_at) VALUES (?, ?, ?, ?)").bind(id, code, title, new Date().toISOString()).run();
+  await env.DB.prepare("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)").bind(id, user.id).run();
+  return json({ id, code, title }, 201);
+}
+
+async function joinGroup(request: Request, env: Env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+  const body = await readJson(request);
+  const code = String(body.code ?? "").trim().toUpperCase();
+  const group = await env.DB.prepare("SELECT id, code, title FROM groups WHERE code = ?").bind(code).first<{ id: string; code: string; title: string }>();
+  if (!group) return json({ error: "Không thấy nhóm với mã này." }, 404);
+  await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)").bind(group.id, user.id).run();
+  return json(group);
 }
 
 async function postChat(request: Request, env: Env) {
@@ -281,19 +384,27 @@ async function postChat(request: Request, env: Env) {
   const text = String(body.body ?? "").trim();
   if (!text || text.length > 2000) return json({ error: "Tin nhắn trống hoặc quá dài." }, 400);
   const admin = isAdmin(user, env);
-  const threadUserId = admin ? String(body.userId ?? "") : user.id;
-  if (!threadUserId) return json({ error: "Thiếu cuộc trò chuyện." }, 400);
-  await env.DB.prepare(
-    "INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(
-      crypto.randomUUID(),
-      threadUserId,
-      user.id,
-      admin ? "admin" : "customer",
-      text,
-      new Date().toISOString(),
+  const groupId = String(body.groupId ?? "").trim();
+  if (groupId) {
+    if (!admin) {
+      const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?")
+        .bind(groupId, user.id)
+        .first();
+      if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
+    }
+    await env.DB.prepare(
+      "INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
+      .bind(crypto.randomUUID(), user.id, user.id, admin ? "admin" : "customer", text, new Date().toISOString(), groupId)
+      .run();
+    return json({ ok: true }, 201);
+  }
+  const requested = String(body.userId ?? "").trim();
+  const threadUserId = admin && requested ? requested : user.id;
+  await env.DB.prepare(
+    "INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at, group_id) VALUES (?, ?, ?, ?, ?, ?, NULL)",
+  )
+    .bind(crypto.randomUUID(), threadUserId, user.id, admin ? "admin" : "customer", text, new Date().toISOString())
     .run();
   return json({ ok: true }, 201);
 }
@@ -387,11 +498,31 @@ function publicUser(user: UserRow, env: Env) {
 }
 
 function isAdmin(user: UserRow, env: Env) {
+  if (Number(user.is_admin) === 1) return true;
   return Boolean(env.ADMIN_EMAIL && user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase());
 }
 
+async function openSession(env: Env, userId: string) {
+  const token = crypto.randomUUID() + crypto.randomUUID();
+  const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30;
+  await env.DB.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)")
+    .bind(token, userId, expires)
+    .run();
+  return token;
+}
+
+function sessionCookie(token: string) {
+  return cookie(COOKIE, token, 60 * 60 * 24 * 30);
+}
+
+function sessionToken(request: Request) {
+  const header = request.headers.get("Authorization") ?? "";
+  if (header.startsWith("Bearer ")) return header.slice(7).trim();
+  return readCookie(request, COOKIE);
+}
+
 async function currentUser(request: Request, env: Env) {
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   if (!token) return null;
   const now = Math.floor(Date.now() / 1000);
   const row = await env.DB.prepare(
@@ -401,17 +532,6 @@ async function currentUser(request: Request, env: Env) {
     .bind(token, now)
     .first<UserRow>();
   return row;
-}
-
-async function withSession(env: Env, userId: string, response: Response) {
-  const token = crypto.randomUUID() + crypto.randomUUID();
-  const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 14;
-  await env.DB.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)")
-    .bind(token, userId, expires)
-    .run();
-  const headers = new Headers(response.headers);
-  headers.append("Set-Cookie", cookie(COOKIE, token, 60 * 60 * 24 * 14));
-  return new Response(response.body, { status: response.status, headers });
 }
 
 async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
@@ -450,7 +570,7 @@ function withCors(response: Response, request: Request) {
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", origin);
   headers.set("Access-Control-Allow-Credentials", "true");
-  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
   headers.set("Vary", "Origin");
   return new Response(response.body, { status: response.status, headers });

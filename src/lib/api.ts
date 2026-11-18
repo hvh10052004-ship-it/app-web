@@ -1,4 +1,13 @@
 const base = import.meta.env.VITE_API_BASE ?? "";
+const TOKEN_KEY = "webstudio-session";
+
+export function saveSession(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+}
 
 export class ApiError extends Error {
   status: number;
@@ -10,6 +19,8 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
   if (init?.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
