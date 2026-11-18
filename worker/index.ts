@@ -382,15 +382,12 @@ async function withSession(env: Env, userId: string, response: Response) {
 }
 
 async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
-    "deriveBits",
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 10_000, hash: "SHA-256" },
-    key,
-    256,
-  );
-  return { hash: toHex(new Uint8Array(bits)), salt: toHex(salt) };
+  const passwordBytes = new TextEncoder().encode(password);
+  const bytes = new Uint8Array(salt.length + passwordBytes.length);
+  bytes.set(salt);
+  bytes.set(passwordBytes, salt.length);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return { hash: toHex(new Uint8Array(digest)), salt: toHex(salt) };
 }
 
 function safeEqual(a: string, b: string) {
