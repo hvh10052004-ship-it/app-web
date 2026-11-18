@@ -2,69 +2,117 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { siteTypes } from "../data/catalog";
 import { readDraft, writeDraft, type Draft } from "../lib/draft";
+import { useAuth } from "../context/AuthContext";
 
-const services = [
-  { title: "Landing page", text: "Một trang để chạy quảng cáo và nhận liên hệ.", to: "/mau" },
-  { title: "Website công ty", text: "Giới thiệu năng lực, dịch vụ và dự án.", to: "/mau" },
-  { title: "Cửa hàng", text: "Trưng bày sản phẩm, giá và cách đặt hàng.", to: "/yeu-cau" },
-  { title: "Startup", text: "Trang sản phẩm phần mềm và các gói sử dụng.", to: "/yeu-cau" },
-];
+const icons = ["doc", "doc", "megaphone", "bag"] as const;
 
 export function HomePage() {
+  const { user } = useAuth();
   const [draft, setDraft] = useState<Draft>(readDraft);
   const current = siteTypes.find((item) => item.id === draft.typeId) ?? siteTypes[0];
+  const filled = [draft.headline, draft.about, draft.phone].filter((item) => item.trim()).length;
+  const progress = Math.round((filled / 3) * 100);
+  const code = draft.name.replace(/\s+/g, "").slice(0, 6).toUpperCase() || "SITE";
+  const letter = (user?.name || "H").trim().slice(0, 1).toUpperCase();
+
+  function choose(typeId: Draft["typeId"]) {
+    const next = { ...draft, typeId };
+    writeDraft(next);
+    setDraft(next);
+  }
 
   return (
-    <div className="space-y-4 pb-4">
-      <section className="overflow-hidden rounded-[28px] bg-[#102033] p-5 text-white shadow-xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Dịch vụ tạo website</p>
-        <h1 className="mt-3 text-3xl font-extrabold leading-tight">Website rõ việc, dễ xem trên điện thoại.</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          Chọn mẫu, xem trước, rồi gửi yêu cầu. Đội ngũ WebStudio trao đổi với bạn ngay trong ứng dụng.
-        </p>
-        <div className="mt-5 flex gap-2">
-          <Link to="/mau" className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#102033]">
-            Xem kho mẫu
-          </Link>
-          <Link to="/yeu-cau" className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold">
-            Gửi yêu cầu
-          </Link>
+    <div className="space-y-5 bg-[#f6f3ef] pb-6 text-[#1c1917]">
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">Tạo website của bạn</h1>
+          <p className="mt-1 text-sm leading-5 text-stone-500">Chọn loại site — soạn trên điện thoại, xuất bản ngay</p>
+        </div>
+        <Link to="/tai-khoan" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1c1917] text-sm font-bold text-white">
+          {letter}
+        </Link>
+      </header>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-stone-700">Các loại website</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {siteTypes.map((item, index) => {
+            const selected = draft.typeId === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => choose(item.id)}
+                className={`rounded-3xl bg-white p-3 text-left shadow-sm ${selected ? "ring-2 ring-[#7c5cff]" : ""}`}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f3efff] text-[#7c5cff]">
+                  <TypeIcon name={icons[index]} />
+                </span>
+                <p className="mt-3 text-xs font-semibold text-stone-400">{String(index + 1).padStart(2, "0")}</p>
+                <h3 className="mt-1 text-[15px] font-extrabold leading-5">{item.name}</h3>
+                <p className="mt-1 text-xs leading-4 text-stone-500">{item.blurb}</p>
+              </button>
+            );
+          })}
         </div>
       </section>
-      <section className="grid grid-cols-2 gap-3">
-        {services.map((service) => (
-          <Link key={service.title} to={service.to} className="rounded-3xl bg-white p-4 shadow-sm">
-            <h2 className="font-bold">{service.title}</h2>
-            <p className="mt-2 text-sm leading-5 text-slate-500">{service.text}</p>
-          </Link>
-        ))}
-      </section>
-      <section className="rounded-[28px] bg-[#102033] p-5 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">Tạo website của bạn</p>
-        <h1 className="mt-2 text-3xl font-extrabold leading-tight">{draft.name}</h1>
-        <p className="mt-2 text-sm text-slate-300">{current.name}. Soạn trên điện thoại, rồi xem trước.</p>
-        <div className="mt-4 flex gap-2">
-          <Link to="/soan" className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#102033]">Soạn tiếp</Link>
-          <Link to="/xem" className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold">Xem trước</Link>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-stone-700">Đang soạn</h2>
+        <article className="overflow-hidden rounded-[28px] bg-[#24211f] p-3 text-white">
+          <div className="flex gap-3">
+            <img
+              src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=160&q=60"
+              alt=""
+              className="h-16 w-16 rounded-2xl object-cover"
+            />
+            <div>
+              <h3 className="text-base font-extrabold">{current.name}</h3>
+              <p className="text-xs text-stone-300">{current.name} · {code}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-stone-300">
+            <span>Hoàn thiện nội dung</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-white/15">
+            <div className="h-1.5 rounded-full bg-white" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link to="/xem" className="rounded-2xl bg-[#3a3633] py-3 text-center text-sm font-bold">Xem trang</Link>
+            <Link to="/soan" className="rounded-2xl bg-[#8b6cff] py-3 text-center text-sm font-bold">Tiếp tục soạn</Link>
+          </div>
+        </article>
+        <div className="mt-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm">
+          <span className="font-semibold">{current.sections[0]}</span>
+          <span className="text-stone-400">{progress === 100 ? "Đủ" : "Thiếu"}</span>
         </div>
       </section>
-      <div className="grid grid-cols-2 gap-3">
-        {siteTypes.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              const next = { ...draft, typeId: item.id };
-              writeDraft(next);
-              setDraft(next);
-            }}
-            className={`rounded-3xl bg-white p-4 text-left shadow-sm ${draft.typeId === item.id ? "ring-2 ring-[#102033]" : ""}`}
-          >
-            <h2 className="font-bold">{item.name}</h2>
-            <p className="mt-1 text-sm text-slate-500">{item.blurb}</p>
-          </button>
-        ))}
-      </div>
     </div>
+  );
+}
+
+function TypeIcon({ name }: { name: (typeof icons)[number] }) {
+  if (name === "bag") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M6 8h12l-1 12H7L6 8z" />
+        <path d="M9 8V7a3 3 0 0 1 6 0v1" />
+      </svg>
+    );
+  }
+  if (name === "megaphone") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 10v4h3l6 3V7L7 10H4z" />
+        <path d="M16 9a4 4 0 0 1 0 6" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M7 3h7l5 5v13H7V3z" />
+      <path d="M14 3v5h5" />
+    </svg>
   );
 }

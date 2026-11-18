@@ -1,46 +1,39 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 const links = [
-  { to: "/", label: "Trang chủ", end: true },
-  { to: "/mau", label: "Kho mẫu", end: false },
-  { to: "/yeu-cau", label: "Yêu cầu", end: false },
-  { to: "/chat", label: "Chat", end: false },
-  { to: "/tai-khoan", label: "Tài khoản", end: false },
+  { to: "/", label: "Trang chủ", end: true, icon: "home" },
+  { to: "/mau", label: "Mẫu", end: false, icon: "grid" },
+  { to: "/soan", label: "Soạn", end: false, icon: "pen" },
+  { to: "/chat", label: "Chat", end: false, icon: "chat" },
+  { to: "/xem", label: "Xem", end: false, icon: "eye" },
+  { to: "/tai-khoan", label: "Tôi", end: false, icon: "user" },
 ];
 
 export function Shell() {
-  const { user } = useAuth();
+  const location = useLocation();
+  const home = location.pathname === "/";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dbe7ff,transparent_36%),linear-gradient(#e7eef8,#f8fafc)] text-[#102033]">
+    <div className={`min-h-screen ${home ? "bg-[#f6f3ef] text-[#1c1917]" : "bg-[#e7eef8] text-[#102033]"}`}>
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-        <header className="flex items-center justify-between px-4 pt-5 pb-3">
-          <div>
+        {!home && (
+          <header className="px-4 pt-5 pb-3">
             <p className="text-lg font-extrabold tracking-tight">WebStudio</p>
-            <p className="text-xs text-slate-500">{user ? user.name : "Tạo website cho doanh nghiệp"}</p>
-          </div>
-          <NavLink
-            to="/du-an"
-            className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm"
-          >
-            Dự án
-          </NavLink>
-        </header>
-        <main className="flex-1 px-4 pb-32">
+          </header>
+        )}
+        <main className={`flex-1 px-4 pb-28 ${home ? "pt-5" : ""}`}>
           <Outlet />
         </main>
-        <nav className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-white/70 bg-white/90 px-2 py-2 backdrop-blur">
-          <ul className="grid grid-cols-5 gap-1 text-center text-[11px] font-semibold text-slate-500">
+        <nav className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-stone-200 bg-white px-1 py-2">
+          <ul className="grid grid-cols-6 text-center text-[10px] font-semibold text-stone-400">
             {links.map((link) => (
               <li key={link.to}>
                 <NavLink
                   to={link.to}
                   end={link.end}
-                  className={({ isActive }) =>
-                    `block rounded-2xl px-1 py-2 ${isActive ? "bg-[#102033] text-white" : ""}`
-                  }
+                  className={({ isActive }) => `flex flex-col items-center gap-1 py-1 ${isActive ? "text-[#7c5cff]" : ""}`}
                 >
+                  <NavIcon name={link.icon} />
                   {link.label}
                 </NavLink>
               </li>
@@ -49,5 +42,55 @@ export function Shell() {
         </nav>
       </div>
     </div>
+  );
+}
+
+function NavIcon({ name }: { name: string }) {
+  const common = { viewBox: "0 0 24 24", className: "h-5 w-5", fill: "none", stroke: "currentColor", strokeWidth: 1.8 };
+  if (name === "grid") {
+    return (
+      <svg {...common}>
+        <rect x="4" y="4" width="6" height="6" rx="1" />
+        <rect x="14" y="4" width="6" height="6" rx="1" />
+        <rect x="4" y="14" width="6" height="6" rx="1" />
+        <rect x="14" y="14" width="6" height="6" rx="1" />
+      </svg>
+    );
+  }
+  if (name === "pen") {
+    return (
+      <svg {...common}>
+        <path d="M4 20h4l10-10-4-4L4 16v4z" />
+      </svg>
+    );
+  }
+  if (name === "chat") {
+    return (
+      <svg {...common}>
+        <path d="M5 6h14v9H8l-3 3V6z" />
+      </svg>
+    );
+  }
+  if (name === "eye") {
+    return (
+      <svg {...common}>
+        <path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+  if (name === "user") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="8" r="3" />
+        <path d="M5 19c1.5-3 3.8-4 7-4s5.5 1 7 4" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M4 11 12 4l8 7" />
+      <path d="M6 10v9h12v-9" />
+    </svg>
   );
 }
