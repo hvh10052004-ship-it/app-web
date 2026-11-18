@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "webstudio-app",
-      "database_id": "3792ab4b-7d52-48ff-8b99-5e1006cd6b7d"
+      "database_id": "00000000-0000-0000-0000-000000000000"
     }
   ],
   // Tạo bucket đúng tên này trên Cloudflare, rồi gắn binding ASSETS.
@@ -27,7 +27,7 @@
   ],
   // Đổi APP_ORIGIN thành địa chỉ thật của ứng dụng trước khi bạn tự triển khai.
   "vars": {
-    "APP_ORIGIN": "http://127.0.0.1:5173"
+    "APP_ORIGIN": "https://app-web.hvh10052004.workers.dev"
   },
   "rules": [
     {
