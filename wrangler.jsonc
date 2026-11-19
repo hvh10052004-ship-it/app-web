@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webstudio-app",
+  "name": "app-web",
   "main": "worker/index.ts",
   "compatibility_date": "2026-03-01",
   // Giao diện Vite nằm trong dist/. /api do Worker xử lý trước.
@@ -14,7 +14,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "webstudio-app",
+      "database_name": "db",
       "database_id": "aeb6495a-35c9-499c-ad1d-7ae029acfb28"
     }
   ],
