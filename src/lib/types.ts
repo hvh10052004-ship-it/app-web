@@ -24,6 +24,9 @@ export type ChatMessage = {
   sender_role: "customer" | "admin";
   sender_name?: string | null;
   body: string;
+  attachment_key?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
   created_at: string;
 };
 

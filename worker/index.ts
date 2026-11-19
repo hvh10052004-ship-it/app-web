@@ -89,6 +89,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       if (url.pathname === "/api/chat" && request.method === "POST") {
         return postChat(request, env);
       }
+      if (url.pathname === "/api/chat/file" && request.method === "POST") {
+        return postChatFile(request, env);
+      }
       return json({ error: "Không tìm thấy." }, 404);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Lỗi máy chủ.";
@@ -128,6 +131,13 @@ async function ensureSchema(env: Env) {
     await env.DB.prepare("ALTER TABLE messages ADD COLUMN group_id TEXT").run();
   } catch {
     // Cột đã có.
+  }
+  for (const column of ["attachment_key", "attachment_name", "attachment_type"]) {
+    try {
+      await env.DB.prepare(`ALTER TABLE messages ADD COLUMN ${column} TEXT`).run();
+    } catch {
+      // Cột đã có.
+    }
   }
 }
 
@@ -249,10 +259,12 @@ async function uploadAvatar(request: Request, env: Env) {
 }
 
 async function readFile(request: Request, env: Env, key: string) {
-  const user = await currentUser(request, env);
-  if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
-  if (!key.startsWith(`avatars/${user.id}/`) && !isAdmin(user, env)) {
-    return json({ error: "Không có quyền xem tệp này." }, 403);
+  if (!key.startsWith("chat/")) {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+    if (!key.startsWith(`avatars/${user.id}/`) && !isAdmin(user, env)) {
+      return json({ error: "Không có quyền xem tệp này." }, 403);
+    }
   }
   const object = await env.ASSETS.get(key);
   if (!object) return json({ error: "Không thấy tệp." }, 404);
@@ -306,7 +318,7 @@ async function listChat(request: Request, env: Env, url: URL) {
       if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
     }
     const messages = await env.DB.prepare(
-      `SELECT m.id, m.sender_role, m.body, m.created_at, u.name AS sender_name
+      `SELECT m.id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, u.name AS sender_name
        FROM messages m LEFT JOIN users u ON u.id = m.sender_id
        WHERE m.group_id = ? ORDER BY m.created_at ASC`,
     )
@@ -320,7 +332,7 @@ async function listChat(request: Request, env: Env, url: URL) {
     return json({ error: "Không có quyền." }, 403);
   }
   const messages = await env.DB.prepare(
-    `SELECT m.id, m.thread_user_id, m.sender_role, m.body, m.created_at, u.name AS sender_name
+    `SELECT m.id, m.thread_user_id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, u.name AS sender_name
      FROM messages m LEFT JOIN users u ON u.id = m.sender_id
      WHERE m.thread_user_id = ? AND m.group_id IS NULL ORDER BY m.created_at ASC`,
   )
@@ -382,9 +394,15 @@ async function postChat(request: Request, env: Env) {
   if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
   const body = await readJson(request);
   const text = String(body.body ?? "").trim();
-  if (!text || text.length > 2000) return json({ error: "Tin nhắn trống hoặc quá dài." }, 400);
+  const attachmentKey = String(body.attachmentKey ?? "").trim();
+  if ((!text && !attachmentKey) || text.length > 2000) return json({ error: "Tin nhắn trống hoặc quá dài." }, 400);
+  if (attachmentKey && !attachmentKey.startsWith(`chat/${user.id}/`)) {
+    return json({ error: "Tệp không hợp lệ." }, 400);
+  }
   const admin = isAdmin(user, env);
   const groupId = String(body.groupId ?? "").trim();
+  const attachmentName = String(body.attachmentName ?? "").slice(0, 120);
+  const attachmentType = String(body.attachmentType ?? "").slice(0, 80);
   if (groupId) {
     if (!admin) {
       const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?")
@@ -392,21 +410,71 @@ async function postChat(request: Request, env: Env) {
         .first();
       if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
     }
-    await env.DB.prepare(
-      "INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-      .bind(crypto.randomUUID(), user.id, user.id, admin ? "admin" : "customer", text, new Date().toISOString(), groupId)
-      .run();
+    await saveMessage(env, user, admin, user.id, groupId, text, attachmentKey, attachmentName, attachmentType);
     return json({ ok: true }, 201);
   }
   const requested = String(body.userId ?? "").trim();
   const threadUserId = admin && requested ? requested : user.id;
-  await env.DB.prepare(
-    "INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at, group_id) VALUES (?, ?, ?, ?, ?, ?, NULL)",
-  )
-    .bind(crypto.randomUUID(), threadUserId, user.id, admin ? "admin" : "customer", text, new Date().toISOString())
-    .run();
+  await saveMessage(env, user, admin, threadUserId, null, text, attachmentKey, attachmentName, attachmentType);
   return json({ ok: true }, 201);
+}
+
+async function postChatFile(request: Request, env: Env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
+  const form = await request.formData();
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size < 1 || file.size > 8_000_000) {
+    return json({ error: "Chọn ảnh hoặc tệp nhỏ hơn 8MB." }, 400);
+  }
+  const safeName = file.name.replace(/[^\w.\- ]+/g, "").slice(0, 80) || "tep";
+  const key = `chat/${user.id}/${crypto.randomUUID()}-${safeName}`;
+  await env.ASSETS.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type || "application/octet-stream" } });
+  const admin = isAdmin(user, env);
+  const groupId = String(form.get("groupId") ?? "").trim();
+  const caption = String(form.get("body") ?? "").trim().slice(0, 2000);
+  if (groupId) {
+    if (!admin) {
+      const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?").bind(groupId, user.id).first();
+      if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
+    }
+    await saveMessage(env, user, admin, user.id, groupId, caption, key, safeName, file.type || "application/octet-stream");
+    return json({ ok: true }, 201);
+  }
+  const requested = String(form.get("userId") ?? "").trim();
+  const threadUserId = admin && requested ? requested : user.id;
+  await saveMessage(env, user, admin, threadUserId, null, caption, key, safeName, file.type || "application/octet-stream");
+  return json({ ok: true }, 201);
+}
+
+async function saveMessage(
+  env: Env,
+  user: UserRow,
+  admin: boolean,
+  threadUserId: string,
+  groupId: string | null,
+  text: string,
+  attachmentKey: string,
+  attachmentName: string,
+  attachmentType: string,
+) {
+  await env.DB.prepare(
+    `INSERT INTO messages (id, thread_user_id, sender_id, sender_role, body, created_at, group_id, attachment_key, attachment_name, attachment_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      threadUserId,
+      user.id,
+      admin ? "admin" : "customer",
+      text,
+      new Date().toISOString(),
+      groupId,
+      attachmentKey || null,
+      attachmentName || null,
+      attachmentType || null,
+    )
+    .run();
 }
 
 function googleStart(request: Request, env: Env) {

@@ -1,14 +1,11 @@
 import { FormEvent, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { typeById } from "../data/catalog";
-import { readDraft } from "../lib/draft";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, api, clearSession } from "../lib/api";
 
 export function AccountPage() {
   const { user, loading, refresh } = useAuth();
   const navigate = useNavigate();
-  const nick = localStorage.getItem("webstudio-nickname");
 
   if (loading) return <p>Đang tải…</p>;
   if (!user) {
@@ -33,21 +30,14 @@ export function AccountPage() {
     navigate("/");
   }
 
-  const draft = readDraft();
-  const type = typeById(draft.typeId);
-  const code = draft.name.replace(/\s+/g, "").slice(0, 6).toUpperCase() || "SITE";
-
   return (
     <div className="space-y-4 text-[#1c1917]">
       <section className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#7c5cff] text-lg font-bold text-white">
+        <Link to="/toi/ho-so" className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#7c5cff] text-lg font-bold text-white" aria-label="Mở hồ sơ">
           {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" /> : user.name.slice(0, 1)}
-        </div>
+        </Link>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-extrabold">{user.name}</h1>
-          {nick && <p className="text-sm text-[#7c5cff]">{nick}</p>}
-          <p className="text-sm text-stone-500">{type.name} · {code}</p>
-          <p className="text-xs text-stone-400">Đăng nhập: {user.email}</p>
         </div>
         <button type="button" onClick={() => void logout()} className="rounded-2xl bg-white px-3 py-3 text-sm font-bold" aria-label="Đăng xuất">
           ⎋
@@ -144,7 +134,7 @@ export function ThemePage() {
       document.documentElement.dataset.theme = next;
       window.dispatchEvent(new Event("webstudio-theme"));
       setTheme(next);
-    }, 180);
+    }, 2000);
     wave.addEventListener("animationend", () => wave.remove());
   }
 
