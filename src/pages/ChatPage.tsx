@@ -158,7 +158,8 @@ export function ChatPage() {
               )
             )}
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-extrabold">{groupId === "direct" ? "Nhắn riêng với admin" : `${current?.title || groupName || "Nhóm"}${current?.code ? " · " + current.code : ""}`}</h1>
+              <h1 className="truncate text-lg font-extrabold">{groupId === "direct" ? "Nhắn riêng với admin" : current?.title || groupName || "Nhóm"}</h1>
+              {groupId !== "direct" && current?.code && <p className="truncate text-sm font-medium text-[#a8a29e]">mã : {current.code}</p>}
             </div>
           </header>
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
@@ -244,7 +245,7 @@ function chatRows(groups: ChatGroup[], messages: ChatMessage[], userId?: string)
     },
     ...groups.map((group) => ({
       id: group.id,
-      title: group.title + (group.code ? " · " + group.code : ""),
+      title: group.title,
       code: group.code,
       avatarUrl: group.avatarUrl,
       preview: group.last_body || "Chưa có tin",
