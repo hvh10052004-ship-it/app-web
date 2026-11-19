@@ -79,7 +79,7 @@ html[data-theme="dark"] textarea::placeholder {
 }
 
 @keyframes chat-from-left {
-  from { transform: translateX(-100%); }
+  from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
 

@@ -20,6 +20,7 @@ type UserRow = {
   avatar_key: string | null;
   created_at: string;
   is_admin?: number;
+  nickname?: string | null;
 };
 
 const COOKIE = "ws_session";
@@ -120,6 +121,11 @@ async function ensureSchema(env: Env) {
       created_at TEXT NOT NULL
     )`,
   ).run();
+  try {
+    await env.DB.prepare("ALTER TABLE groups ADD COLUMN owner_id TEXT").run();
+  } catch {
+    // Cột đã có.
+  }
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS group_members (
       group_id TEXT NOT NULL,
@@ -129,6 +135,11 @@ async function ensureSchema(env: Env) {
   ).run();
   try {
     await env.DB.prepare("ALTER TABLE messages ADD COLUMN group_id TEXT").run();
+  } catch {
+    // Cột đã có.
+  }
+  try {
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN nickname TEXT").run();
   } catch {
     // Cột đã có.
   }
@@ -207,9 +218,10 @@ async function updateMe(request: Request, env: Env) {
   if (!user) return json({ error: "Bạn cần đăng nhập." }, 401);
   const body = await readJson(request);
   const name = String(body.name ?? user.name).trim();
+  const nickname = String(body.nickname ?? user.nickname ?? "").trim().slice(0, 40);
   if (!name) return json({ error: "Tên không được để trống." }, 400);
-  await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name, user.id).run();
-  return json({ user: publicUser({ ...user, name }, env) });
+  await env.DB.prepare("UPDATE users SET name = ?, nickname = ? WHERE id = ?").bind(name, nickname, user.id).run();
+  return json({ user: publicUser({ ...user, name, nickname }, env) });
 }
 
 async function updateSecurity(request: Request, env: Env) {
@@ -318,7 +330,7 @@ async function listChat(request: Request, env: Env, url: URL) {
       if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
     }
     const messages = await env.DB.prepare(
-      `SELECT m.id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, u.name AS sender_name
+      `SELECT m.id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, COALESCE(NULLIF(u.nickname, ''), u.name) AS sender_name, m.sender_id
        FROM messages m LEFT JOIN users u ON u.id = m.sender_id
        WHERE m.group_id = ? ORDER BY m.created_at ASC`,
     )
@@ -332,7 +344,7 @@ async function listChat(request: Request, env: Env, url: URL) {
     return json({ error: "Không có quyền." }, 403);
   }
   const messages = await env.DB.prepare(
-    `SELECT m.id, m.thread_user_id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, u.name AS sender_name
+    `SELECT m.id, m.thread_user_id, m.sender_role, m.body, m.created_at, m.attachment_key, m.attachment_name, m.attachment_type, COALESCE(NULLIF(u.nickname, ''), u.name) AS sender_name, m.sender_id
      FROM messages m LEFT JOIN users u ON u.id = m.sender_id
      WHERE m.thread_user_id = ? AND m.group_id IS NULL ORDER BY m.created_at ASC`,
   )
@@ -342,10 +354,12 @@ async function listChat(request: Request, env: Env, url: URL) {
   if (isAdmin(user, env)) {
     const rows = await env.DB.prepare(
       `SELECT u.id, u.name, u.email,
-        (SELECT body FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_body
+        (SELECT body FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_body,
+        (SELECT created_at FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_at,
+        (SELECT sender_id FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_sender_id
        FROM users u
        WHERE u.is_admin = 0 AND u.id IN (SELECT DISTINCT thread_user_id FROM messages WHERE group_id IS NULL)
-       ORDER BY u.created_at DESC`,
+       ORDER BY last_at DESC`,
     ).all();
     threads = rows.results ?? [];
   }
@@ -354,16 +368,25 @@ async function listChat(request: Request, env: Env, url: URL) {
 
 async function listVisibleGroups(env: Env, user: UserRow) {
   const query = isAdmin(user, env)
-    ? `SELECT g.id, g.code, g.title,
-        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body
-       FROM groups g ORDER BY g.created_at DESC`
-    : `SELECT g.id, g.code, g.title,
-        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body
+    ? `SELECT g.id, g.code, g.title, g.owner_id,
+        (SELECT avatar_key FROM users WHERE id = g.owner_id) AS avatar_key,
+        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body,
+        (SELECT created_at FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_at,
+        (SELECT sender_id FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_sender_id
+       FROM groups g ORDER BY last_at DESC`
+    : `SELECT g.id, g.code, g.title, g.owner_id,
+        (SELECT avatar_key FROM users WHERE id = g.owner_id) AS avatar_key,
+        (SELECT body FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_body,
+        (SELECT created_at FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_at,
+        (SELECT sender_id FROM messages m WHERE m.group_id = g.id ORDER BY created_at DESC LIMIT 1) AS last_sender_id
        FROM groups g JOIN group_members gm ON gm.group_id = g.id
-       WHERE gm.user_id = ? ORDER BY g.created_at DESC`;
+       WHERE gm.user_id = ? ORDER BY last_at DESC`;
   const statement = env.DB.prepare(query);
   const rows = isAdmin(user, env) ? await statement.all() : await statement.bind(user.id).all();
-  return rows.results ?? [];
+  return (rows.results ?? []).map((row) => {
+    const item = row as { avatar_key?: string | null };
+    return { ...item, avatarUrl: item.avatar_key ? `/api/files/${item.avatar_key}` : null };
+  });
 }
 
 async function createGroup(request: Request, env: Env) {
@@ -373,7 +396,7 @@ async function createGroup(request: Request, env: Env) {
   const title = String(body.title ?? "Nhóm với admin").trim().slice(0, 40) || "Nhóm với admin";
   const id = crypto.randomUUID();
   const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-  await env.DB.prepare("INSERT INTO groups (id, code, title, created_at) VALUES (?, ?, ?, ?)").bind(id, code, title, new Date().toISOString()).run();
+  await env.DB.prepare("INSERT INTO groups (id, code, title, owner_id, created_at) VALUES (?, ?, ?, ?, ?)").bind(id, code, title, user.id, new Date().toISOString()).run();
   await env.DB.prepare("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)").bind(id, user.id).run();
   return json({ id, code, title }, 201);
 }
@@ -559,6 +582,7 @@ function publicUser(user: UserRow, env: Env) {
     id: user.id,
     email: user.email,
     name: user.name,
+    nickname: user.nickname || "",
     provider: user.provider,
     avatarUrl: user.avatar_key ? `/api/files/${user.avatar_key}` : null,
     isAdmin: isAdmin(user, env),

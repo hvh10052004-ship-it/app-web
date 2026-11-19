@@ -2,6 +2,7 @@ export type User = {
   id: string;
   email: string;
   name: string;
+  nickname?: string;
   provider: string;
   avatarUrl: string | null;
   isAdmin: boolean;
@@ -22,6 +23,7 @@ export type ChatMessage = {
   id: string;
   thread_user_id?: string;
   sender_role: "customer" | "admin";
+  sender_id?: string;
   sender_name?: string | null;
   body: string;
   attachment_key?: string | null;
@@ -34,7 +36,10 @@ export type ChatGroup = {
   id: string;
   code: string;
   title: string;
+  avatarUrl?: string | null;
   last_body?: string | null;
+  last_at?: string | null;
+  last_sender_id?: string | null;
 };
 
 export type ChatThread = {
@@ -42,4 +47,6 @@ export type ChatThread = {
   name: string;
   email: string;
   last_body: string | null;
+  last_at?: string | null;
+  last_sender_id?: string | null;
 };

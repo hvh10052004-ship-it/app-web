@@ -114,15 +114,26 @@ export function ChatPage() {
             <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="NHẬP MÃ NHÓM" className="flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm uppercase" />
             <button className="rounded-2xl bg-[#1c1917] px-4 text-sm font-bold text-white">Vào</button>
           </form>
-          <button type="button" onClick={() => { setSlide("in"); setGroupId("direct"); }} className="block w-full rounded-3xl bg-white px-4 py-4 text-left">
-            <span className="block font-extrabold">Nhắn riêng với admin</span>
-            <span className="mt-1 block text-sm text-stone-500">Chỉ bạn và admin</span>
-          </button>
-          {groups.map((group) => (
-            <button key={group.id} type="button" onClick={() => { setInvite(group.code); setSlide("in"); setGroupId(group.id); }} className="block w-full rounded-3xl bg-white px-4 py-4 text-left">
-              <span className="block font-extrabold">{group.title}</span>
-              <span className="mt-1 block text-sm text-stone-500">Mã {group.code}</span>
-              <span className="mt-1 block truncate text-sm text-stone-400">{group.last_body || "Chưa có tin"}</span>
+          {chatRows(groups, messages, user?.id).map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => {
+                markSeen(row.id, row.at);
+                setInvite(row.code);
+                setSlide("in");
+                setGroupId(row.id);
+              }}
+              className="block w-full rounded-3xl bg-white px-4 py-4 text-left"
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  {row.avatarUrl && <img src={row.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />}
+                  <span className={`truncate ${row.unread ? "font-extrabold text-[#1c1917]" : "font-semibold text-stone-500"}`}>{row.title}</span>
+                </span>
+                <span className={`shrink-0 text-xs ${row.unread ? "font-bold text-[#1c1917]" : "text-stone-400"}`}>{chatTime(row.at)}</span>
+              </span>
+              <span className={`mt-1 block truncate text-sm ${row.unread ? "font-semibold text-stone-800" : "text-stone-400"}`}>{row.preview}</span>
             </button>
           ))}
         </div>
@@ -143,6 +154,13 @@ export function ChatPage() {
             <button type="button" onClick={() => setSlide("out")} className="flex h-10 w-10 items-center justify-center text-2xl" aria-label="Thoát cuộc nhắn">
               ←
             </button>
+            {groupId !== "direct" && (
+              current?.avatarUrl ? (
+                <img src={current.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#efeaff] text-sm font-bold">{(current?.title || groupName || "N").slice(0, 1)}</span>
+              )
+            )}
             <div className="min-w-0">
               <h1 className="truncate text-lg font-extrabold">{groupId === "direct" ? "Nhắn riêng với admin" : current?.title || groupName || "Nhóm"}</h1>
               {groupId !== "direct" && <p className="truncate text-xs text-stone-500">Mã {invite || current?.code}</p>}
@@ -151,10 +169,13 @@ export function ChatPage() {
           <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
             {messages.length === 0 && <p className="text-sm text-stone-500">Chưa có tin. Hãy nhắn để admin thấy.</p>}
             {messages.map((message) => {
-              const mine = message.sender_role !== "admin" && message.sender_name === user?.name;
+              const mine = message.sender_id === user?.id;
+              const label = mine
+                ? localStorage.getItem("webstudio-nickname") || user?.nickname || user?.name || message.sender_name
+                : message.sender_name || (message.sender_role === "admin" ? "Admin" : "Thành viên");
               return (
                 <article key={message.id} className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${message.sender_role === "admin" ? "bg-[#efeaff]" : mine ? "ml-auto bg-white" : "bg-white"}`}>
-                  <p className="mb-1 text-xs font-semibold text-stone-400">{message.sender_role === "admin" ? "Admin" : message.sender_name || "Thành viên"}</p>
+                  <p className="mb-1 flex justify-between gap-3 text-xs font-semibold text-stone-400"><span>{label}</span><span>{chatTime(message.created_at)}</span></p>
                   {message.body && <p>{message.body}</p>}
                   <Attachment message={message} />
                 </article>
@@ -186,6 +207,61 @@ export function ChatPage() {
       )}
     </div>
   );
+}
+
+const SEEN_KEY = "webstudio-chat-seen";
+
+function readSeen() {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function markSeen(id: string, at: string) {
+  const seen = readSeen();
+  seen[id] = at || new Date().toISOString();
+  localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+}
+
+function chatTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  }
+  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+}
+
+function chatRows(groups: ChatGroup[], messages: ChatMessage[], userId?: string) {
+  const seen = readSeen();
+  const direct = messages.at(-1);
+  const rows = [
+    {
+      id: "direct",
+      title: "Nhắn riêng với admin",
+      code: "",
+      avatarUrl: null as string | null,
+      preview: direct?.body || direct?.attachment_name || "Chỉ bạn và admin",
+      at: direct?.created_at || "",
+      sender: direct?.sender_id,
+    },
+    ...groups.map((group) => ({
+      id: group.id,
+      title: group.title,
+      code: group.code,
+      avatarUrl: group.avatarUrl,
+      preview: group.last_body || "Chưa có tin",
+      at: group.last_at || "",
+      sender: group.last_sender_id,
+    })),
+  ];
+  return rows
+    .map((row) => ({ ...row, unread: Boolean(row.at && row.sender && row.sender !== userId && (seen[row.id] || "") < row.at) }))
+    .sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 }
 
 const emojis = ["😀", "😂", "😍", "👍", "🙏", "🎉", "❤️", "😢", "😮", "🔥", "✅"];

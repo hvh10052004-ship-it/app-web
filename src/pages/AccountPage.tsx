@@ -53,7 +53,7 @@ const NICK_KEY = "webstudio-nickname";
 export function ProfilePage() {
   const { user, refresh } = useAuth();
   const [name, setName] = useState(user?.name ?? "");
-  const [nick, setNick] = useState(() => localStorage.getItem(NICK_KEY) ?? "");
+  const [nick, setNick] = useState(user?.nickname || localStorage.getItem(NICK_KEY) || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   if (!user) return null;
@@ -63,7 +63,7 @@ export function ProfilePage() {
     setError("");
     localStorage.setItem(NICK_KEY, nick.trim());
     try {
-      await api("/api/me", { method: "PATCH", body: JSON.stringify({ name }) });
+      await api("/api/me", { method: "PATCH", body: JSON.stringify({ name, nickname: nick.trim() }) });
       await refresh();
       setMessage("Đã lưu tên và biệt danh.");
     } catch (err) {
