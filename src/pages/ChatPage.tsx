@@ -174,7 +174,7 @@ export function ChatPage() {
                 ? localStorage.getItem("webstudio-nickname") || user?.nickname || user?.name || message.sender_name
                 : message.sender_name || (message.sender_role === "admin" ? "Admin" : "Thành viên");
               return (
-                <article key={message.id} className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${message.sender_role === "admin" ? "bg-[#efeaff]" : mine ? "ml-auto bg-white" : "bg-white"}`}>
+                <article key={message.id} className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${mine ? "bg-white" : "ml-auto bg-[#efeaff]"}`}>
                   <p className="mb-1 flex justify-between gap-3 text-xs font-semibold text-stone-400"><span>{label}</span><span>{chatTime(message.created_at)}</span></p>
                   {message.body && <p>{message.body}</p>}
                   <Attachment message={message} />
@@ -278,11 +278,28 @@ function EmojiBar({ onPick }: { onPick: (emoji: string) => void }) {
   );
 }
 
+function isImageMessage(message: ChatMessage) {
+  if (message.attachment_type?.startsWith("image/")) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(message.attachment_name || message.attachment_key || "");
+}
+
 function Attachment({ message }: { message: ChatMessage }) {
+  const [open, setOpen] = useState(false);
   if (!message.attachment_key) return null;
-  const href = `/api/files/${message.attachment_key}`;
-  if (message.attachment_type?.startsWith("image/")) {
-    return <img src={href} alt={message.attachment_name || "Ảnh"} className="mt-2 max-h-52 rounded-xl object-cover" />;
+  const href = `/api/files/${message.attachment_key.split("/").map(encodeURIComponent).join("/")}`;
+  if (isImageMessage(message)) {
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)} className="mt-2 block">
+          <img src={href} alt={message.attachment_name || "Ảnh"} className="h-24 w-24 rounded-xl object-cover" />
+        </button>
+        {open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setOpen(false)}>
+            <img src={href} alt={message.attachment_name || "Ảnh"} className="max-h-full max-w-full object-contain" />
+          </div>
+        )}
+      </>
+    );
   }
   return (
     <a href={href} className="mt-2 block font-semibold text-[#5b45c7]" target="_blank" rel="noreferrer">

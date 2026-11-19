@@ -70,7 +70,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
         return updateSecurity(request, env);
       }
       if (url.pathname.startsWith("/api/files/") && request.method === "GET") {
-        return readFile(request, env, url.pathname.slice("/api/files/".length));
+        const key = decodeURIComponent(url.pathname.slice("/api/files/".length));
+        return readFile(request, env, key);
       }
       if (url.pathname === "/api/requests" && request.method === "POST") {
         return createRequest(request, env);
