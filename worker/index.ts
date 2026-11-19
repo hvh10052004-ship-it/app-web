@@ -354,7 +354,7 @@ async function listChat(request: Request, env: Env, url: URL) {
   let threads: unknown[] = [];
   if (isAdmin(user, env)) {
     const rows = await env.DB.prepare(
-      `SELECT u.id, u.name, u.email,
+      `SELECT u.id, COALESCE(NULLIF(u.nickname, ''), u.name) AS name, u.nickname, u.email,
         (SELECT body FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_body,
         (SELECT created_at FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_at,
         (SELECT sender_id FROM messages m WHERE m.thread_user_id = u.id AND m.group_id IS NULL ORDER BY created_at DESC LIMIT 1) AS last_sender_id

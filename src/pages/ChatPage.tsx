@@ -13,7 +13,6 @@ export function ChatPage() {
   const [code, setCode] = useState("");
   const [groupName, setGroupName] = useState("");
   const [error, setError] = useState("");
-  const [invite, setInvite] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   async function load(nextGroup = groupId) {
@@ -65,7 +64,6 @@ export function ChatPage() {
         method: "POST",
         body: JSON.stringify({ title: groupName.trim() || "Nhóm với admin" }),
       });
-      setInvite(data.code);
       setSlide("in");
       setGroupId(data.id);
     } catch (err) {
@@ -82,7 +80,6 @@ export function ChatPage() {
         body: JSON.stringify({ code }),
       });
       setCode("");
-      setInvite(data.code);
       setSlide("in");
       setGroupId(data.id);
     } catch (err) {
@@ -121,7 +118,6 @@ export function ChatPage() {
               type="button"
               onClick={() => {
                 markSeen(row.id, row.at);
-                setInvite(row.code);
                 setSlide("in");
                 setGroupId(row.id);
               }}
@@ -146,7 +142,6 @@ export function ChatPage() {
           onAnimationEnd={() => {
             if (slide === "out") {
               setGroupId(null);
-              setInvite("");
               setSlide("in");
             }
           }}
@@ -164,7 +159,6 @@ export function ChatPage() {
             )}
             <div className="min-w-0">
               <h1 className="truncate text-lg font-extrabold">{groupId === "direct" ? "Nhắn riêng với admin" : current?.title || groupName || "Nhóm"}</h1>
-              {groupId !== "direct" && <p className="truncate text-xs text-stone-500">Mã {invite || current?.code}</p>}
             </div>
           </header>
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
