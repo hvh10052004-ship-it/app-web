@@ -134,7 +134,7 @@ export function ThemePage() {
       document.documentElement.dataset.theme = next;
       window.dispatchEvent(new Event("webstudio-theme"));
       setTheme(next);
-    }, 2000);
+    }, 1500);
     wave.addEventListener("animationend", () => wave.remove());
   }
 

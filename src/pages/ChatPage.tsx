@@ -166,16 +166,14 @@ export function ChatPage() {
               {groupId !== "direct" && <p className="truncate text-xs text-stone-500">Mã {invite || current?.code}</p>}
             </div>
           </header>
-          <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
             {messages.length === 0 && <p className="text-sm text-stone-500">Chưa có tin. Hãy nhắn để admin thấy.</p>}
             {messages.map((message) => {
               const mine = message.sender_id === user?.id;
-              const label = mine
-                ? localStorage.getItem("webstudio-nickname") || user?.nickname || user?.name || message.sender_name
-                : message.sender_name || (message.sender_role === "admin" ? "Admin" : "Thành viên");
+              const label = message.sender_name || (mine ? localStorage.getItem("webstudio-nickname") || user?.nickname || user?.name : "") || (message.sender_role === "admin" ? "Admin" : "Thành viên");
               return (
-                <article key={message.id} className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${mine ? "bg-white" : "ml-auto bg-[#efeaff]"}`}>
-                  <p className="mb-1 flex justify-between gap-3 text-xs font-semibold text-stone-400"><span>{label}</span><span>{chatTime(message.created_at)}</span></p>
+                <article key={message.id} className={`w-fit max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${mine ? "self-start bg-white" : "self-end bg-[#efeaff]"}`}>
+                  <p className="mb-1 flex justify-between gap-3 text-xs font-bold text-[#5b45c7]"><span>{label}</span><span className="font-semibold text-stone-400">{chatTime(message.created_at)}</span></p>
                   {message.body && <p>{message.body}</p>}
                   <Attachment message={message} />
                 </article>
