@@ -423,12 +423,13 @@ async function postChat(request: Request, env: Env) {
   if (attachmentKey && !attachmentKey.startsWith(`chat/${user.id}/`)) {
     return json({ error: "Tệp không hợp lệ." }, 400);
   }
-  const admin = isAdmin(user, env);
+  const staff = isAdmin(user, env);
+  const admin = staff && body.asCustomer !== true;
   const groupId = String(body.groupId ?? "").trim();
   const attachmentName = String(body.attachmentName ?? "").slice(0, 120);
   const attachmentType = String(body.attachmentType ?? "").slice(0, 80);
   if (groupId) {
-    if (!admin) {
+    if (!staff) {
       const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?")
         .bind(groupId, user.id)
         .first();
@@ -454,11 +455,12 @@ async function postChatFile(request: Request, env: Env) {
   const safeName = file.name.replace(/[^\w.\- ]+/g, "").slice(0, 80) || "tep";
   const key = `chat/${user.id}/${crypto.randomUUID()}-${safeName}`;
   await env.ASSETS.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type || "application/octet-stream" } });
-  const admin = isAdmin(user, env);
+  const staff = isAdmin(user, env);
+  const admin = staff && form.get("asCustomer") !== "1";
   const groupId = String(form.get("groupId") ?? "").trim();
   const caption = String(form.get("body") ?? "").trim().slice(0, 2000);
   if (groupId) {
-    if (!admin) {
+    if (!staff) {
       const member = await env.DB.prepare("SELECT 1 AS ok FROM group_members WHERE group_id = ? AND user_id = ?").bind(groupId, user.id).first();
       if (!member) return json({ error: "Bạn chưa ở trong nhóm này." }, 403);
     }

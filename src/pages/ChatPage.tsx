@@ -36,6 +36,7 @@ export function ChatPage() {
     const form = new FormData();
     form.set("file", file);
     if (groupId && groupId !== "direct") form.set("groupId", groupId);
+    form.set("asCustomer", "1");
     try {
       await api("/api/chat/file", { method: "POST", body: form });
       await load(groupId);
@@ -49,7 +50,7 @@ export function ChatPage() {
     const body = text.trim();
     if (!body) return;
     try {
-      await api("/api/chat", { method: "POST", body: JSON.stringify({ body, groupId: groupId === "direct" ? undefined : groupId }) });
+      await api("/api/chat", { method: "POST", body: JSON.stringify({ body, groupId: groupId === "direct" ? undefined : groupId, asCustomer: true }) });
       setText("");
       await load(groupId);
     } catch {
@@ -169,8 +170,8 @@ export function ChatPage() {
           <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
             {messages.length === 0 && <p className="text-sm text-stone-500">Chưa có tin. Hãy nhắn để admin thấy.</p>}
             {messages.map((message) => {
-              const mine = message.sender_id === user?.id;
-              const label = message.sender_name || (mine ? localStorage.getItem("webstudio-nickname") || user?.nickname || user?.name : "") || (message.sender_role === "admin" ? "Admin" : "Thành viên");
+              const mine = Boolean(message.sender_id) && message.sender_id === user?.id;
+              const label = message.sender_name || (message.sender_role === "admin" ? "Admin" : "Khách");
               return (
                 <article key={message.id} className={`w-fit max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${mine ? "self-start bg-white" : "self-end bg-[#efeaff]"}`}>
                   <p className="mb-1 flex justify-between gap-3 text-xs font-bold text-[#5b45c7]"><span>{label}</span><span className="font-semibold text-stone-400">{chatTime(message.created_at)}</span></p>
